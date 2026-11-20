@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Digital Pawn Ticket | DFQ Trade Crow</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="assets/css/style.css" rel="stylesheet" />
+  <style>
+    .ticket-box {
+      max-width: 680px;
+      margin: 40px auto;
+      background: var(--bg-surface, #ffffff);
+      border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: 16px;
+      padding: 30px;
+    }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: #fff !important; }
+      .ticket-box { border: 1px solid #000; box-shadow: none !important; margin: 0; max-width: 100%; }
+    }
+  </style>
+  <script>
+    (function () {
+      const saved = localStorage.getItem("dfq_theme_mode");
+      const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const theme = saved || (prefersDark ? "dark" : "light");
+      document.documentElement.setAttribute("data-bs-theme", theme);
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+</head>
+<body>
+  <div class="ticket-box shadow-sm" id="ticketContainer">
+    <div class="text-center py-4">
+      <div class="spinner-border text-sky" role="status"></div>
+      <p class="text-muted mt-2">Loading official pawn ticket...</p>
+    </div>
+  </div>
+
+  <script>
+    async function loadPawnTicket() {
+      const container = document.getElementById('ticketContainer');
+      const params = new URLSearchParams(window.location.search);
+      const ticketId = params.get('id') || '103';
+
+      try {
+        const res = await fetch(`/api/tickets/${ticketId}`);
+        const data = await res.json();
+
+        if (!data.success || !data.item) {
+          container.innerHTML = `
+            <div class="alert alert-warning mb-0">
+              <h5 class="fw-bold">Pawn Ticket Not Found</h5>
+              <p class="mb-0">Pawn ticket not found or this item is not an active Pawn/Quick Sale listing.</p>
+              <a href="index.html" class="btn btn-sky btn-sm mt-3">Return to Marketplace</a>
+            </div>
+          `;
+          return;
+        }
+
+        const item = data.item;
+        document.title = `Digital Pawn Ticket #DFQ-${item.id} | DFQ Trade Crow`;
+
+        const ticketNum = String(item.id).padStart(5, '0');
+        const estVal = Number(item.est_value || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+        const advance = Number(item.pawn_advance || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+        const buyback = Number(item.pawn_buyback || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+
+        container.innerHTML = `
+          <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+            <div>
+              <span class="badge bg-info text-dark mb-1">OFFICIAL PAWN &amp; BUYBACK RECEIPT</span>
+              <h4 class="fw-bold mb-0">DFQ Trade Crow</h4>
+              <small class="text-muted">Ticket ID: #DFQ-PAWN-${ticketNum}</small>
+            </div>
+            <div class="d-flex gap-2">
+              <button onclick="window.print()" class="btn btn-sky btn-sm no-print">Print / Save PDF</button>
+              <a href="index.html" class="btn btn-outline-secondary btn-sm no-print">Marketplace</a>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3 small">
+            <div class="col-6"><strong>Item Collateral:</strong><br>${item.title}</div>
+            <div class="col-6"><strong>Condition:</strong><br>${item.item_condition || 'Neatly Used'}</div>
+            <div class="col-6"><strong>Serial / IMEI:</strong><br>${item.serial_imei || 'N/A'}</div>
+            <div class="col-6"><strong>Owner / Holder:</strong><br>${item.full_name} (${item.phone || item.email})</div>
+          </div>
+
+          <div class="p-3 rounded-3 bg-light border mb-3">
+            <div class="row text-center">
+              <div class="col-4 border-end">
+                <small class="text-muted d-block">Est. Valuation</small>
+                <strong>₦${estVal}</strong>
+              </div>
+              <div class="col-4 border-end">
+                <small class="text-muted d-block">Pawn Advance</small>
+                <strong>₦${advance}</strong>
+              </div>
+              <div class="col-4">
+                <small class="text-muted d-block">Buyback Total (10%)</small>
+                <strong class="text-primary">₦${buyback}</strong>
+              </div>
+            </div>
+          </div>
+
+          <p class="small text-muted mb-0">
+            <strong>Redemption Deadline:</strong> ${item.pawn_due_date || 'Open Agreement'}.
+            Upon full payment of the buyback total before the deadline, collateral ownership reverts 100% to the holder.
+            Transactions are protected under DFQ Escrow Terms & NDPR Compliance Guidelines.
+          </p>
+        `;
+      } catch (err) {
+        container.innerHTML = `
+          <div class="alert alert-danger mb-0">
+            <h5>Error Loading Ticket</h5>
+            <p class="mb-0">${err.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadPawnTicket);
+  </script>
+</body>
+</html>

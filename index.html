@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0EA5E9" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>DFQ Trade Crow | Trade by Barter, Pawn &amp; Peer-to-Peer Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+  <link href="assets/css/style.css" rel="stylesheet" />
+  <script>
+  (function () {
+    const saved = localStorage.getItem("dfq_theme_mode");
+    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const theme = saved || (prefersDark ? "dark" : "light");
+    document.documentElement.setAttribute("data-bs-theme", theme);
+    document.documentElement.setAttribute("data-theme", theme);
+  })();
+</script>
+</head>
+<body>
+  <nav class="navbar navbar-custom sticky-top py-2.5">
+    <div class="container d-flex align-items-center justify-content-between gap-2">
+      <a class="navbar-brand d-flex align-items-center gap-2 fw-bold fs-4 mb-0" href="index.html">
+        <span class="brand-logo-wrap">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 7L16 3M20 7L16 11M20 7H9C6.79086 7 5 8.79086 5 11V12" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 17L8 21M4 17L8 13M4 17H15C17.2091 17 19 15.2091 19 13V12" stroke="#E0F2FE" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span>DFQ <span class="text-sky">Trade Crow</span></span>
+      </a>
+
+      <div class="d-flex align-items-center gap-1.5 gap-sm-2 flex-wrap justify-content-end" id="mainNav">
+        <!-- Browse Marketplace Icon -->
+        <a href="#marketplace" class="btn btn-light border nav-icon-btn" data-bs-toggle="tooltip" title="Browse Marketplace" aria-label="Browse Marketplace">
+          <i class="bi bi-shop text-sky"></i>
+        </a>
+
+        <!-- Verify IMEI / Serial Icon -->
+        <button type="button" class="btn btn-light border nav-icon-btn" data-bs-toggle="modal" data-bs-target="#serialCheckModal" title="Verify Device Serial / IMEI" aria-label="Verify Device Serial / IMEI">
+          <i class="bi bi-qr-code-scan text-sky"></i>
+        </button>
+
+        <!-- Verify KYC / OTP Icon -->
+        <button type="button" id="btnOpenKycModal" class="btn btn-outline-success nav-icon-btn" onclick="openKycModal()" title="Verify KYC / Phone OTP" aria-label="Verify KYC / Phone OTP">
+          <i class="bi bi-patch-check-fill"></i>
+          <span id="kycNavText" class="visually-hidden">Verify KYC / OTP</span>
+        </button>
+
+        <!-- My Trade Desk Icon -->
+        <a href="dashboard.html" class="btn btn-light border nav-icon-btn" title="My Trade Desk" aria-label="My Trade Desk">
+          <i class="bi bi-kanban text-sky"></i>
+        </a>
+
+        <!-- Admin Icon (visible when logged in as admin) -->
+        <a href="admin.html" id="adminNavLink" class="btn btn-dark nav-icon-btn d-none" title="Admin Moderation Panel" aria-label="Admin Moderation Panel">
+          <i class="bi bi-shield-lock"></i>
+        </a>
+
+        <!-- Guest Login & Sign Up Icons -->
+        <div id="guestNavBtns" class="d-flex align-items-center gap-1.5 gap-sm-2">
+          <button type="button" class="btn btn-outline-sky nav-icon-btn" onclick="openAuthModal('login')" title="Log In" aria-label="Log In">
+            <i class="bi bi-box-arrow-in-right"></i>
+          </button>
+          <button type="button" class="btn btn-light border nav-icon-btn" onclick="openAuthModal('register')" title="Create Account (Sign Up)" aria-label="Create Account">
+            <i class="bi bi-person-plus-fill text-sky"></i>
+          </button>
+        </div>
+
+        <!-- Logged-In User Icon Pill + Logout Icon -->
+        <div id="userNavBadge" class="d-none align-items-center gap-1.5">
+          <span class="badge bg-sky-light text-sky px-2.5 py-2 rounded-pill fw-semibold d-inline-flex align-items-center gap-1" id="navUserName" title="Signed-in Trader">
+            <i class="bi bi-person-check-fill"></i>
+          </span>
+          <button type="button" class="btn btn-light border nav-icon-btn text-danger" id="btnLogout" title="Log Out" aria-label="Log Out">
+            <i class="bi bi-box-arrow-right"></i>
+          </button>
+        </div>
+
+        <!-- Post Item to Swap Icon -->
+        <button type="button" class="btn btn-sky nav-icon-btn" id="btnOpenPostModal" title="Post Item to Swap" aria-label="Post Item to Swap">
+          <i class="bi bi-plus-lg"></i>
+        </button>
+
+        <!-- Dark / Light Theme Icon -->
+        <button type="button" class="btn btn-light border nav-icon-btn" data-theme-toggle title="Toggle Dark / Light Theme" aria-label="Toggle Dark / Light Theme">
+          <i class="bi bi-moon-stars-fill"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero-section">
+    <div class="hero-playful-bubbles" aria-hidden="true">
+      <div class="playful-bubble b1"><i class="bi bi-arrow-left-right"></i></div>
+      <div class="playful-bubble b2"><i class="bi bi-stars"></i></div>
+      <div class="playful-bubble b3"><i class="bi bi-controller"></i></div>
+      <div class="playful-bubble b4"><i class="bi bi-bicycle"></i></div>
+      <div class="playful-bubble b5"><i class="bi bi-heart-fill text-danger"></i></div>
+      <div class="playful-bubble b6"><i class="bi bi-shield-fill-check text-success"></i></div>
+    </div>
+    <div class="container">
+      <div class="row align-items-center g-4">
+        <div class="col-lg-8 mx-auto text-center">
+          <div class="hero-badge mb-3">
+            <i class="bi bi-shield-check"></i>
+            <span>Receipt-Verified Barter &bull; Digital Pawn Tickets &bull; Escrow Hold</span>
+          </div>
+          <h1 class="display-5 fw-extrabold mb-3" style="letter-spacing: -0.02em;">
+            Swap What You Have for <span class="text-sky">What You Need.</span>
+          </h1>
+          <p class="lead text-secondary mb-4 mx-auto" style="max-width: 640px; font-size: 1.08rem;">
+            Got a 3-seater couch and need a bed frame? Or looking to pawn electronics with a verifiable receipt? Post on <strong>DFQ Trade Crow</strong> and swap safely.
+          </p>
+          <div class="hero-search-box mx-auto text-start" style="max-width: 780px;">
+            <div class="row g-2 align-items-center">
+              <div class="col-md-6 border-end">
+                <div class="input-group">
+                  <span class="input-group-text bg-transparent border-0 text-sky"><i class="bi bi-search"></i></span>
+                  <input type="text" id="searchInput" class="form-control" placeholder="Search couch, bed, iPhone, or Serial/IMEI..." />
+                </div>
+              </div>
+              <div class="col-md-3 border-end">
+                <div class="input-group">
+                  <span class="input-group-text bg-transparent border-0 text-muted"><i class="bi bi-geo-alt-fill text-sky"></i></span>
+                  <select id="locationFilter" class="form-select">
+                    <option value="all">All Locations</option>
+                    <option value="Lekki, Lagos">Lekki, Lagos</option>
+                    <option value="Yaba, Lagos">Yaba, Lagos</option>
+                    <option value="Ikeja, Lagos">Ikeja, Lagos</option>
+                    <option value="Abuja">Abuja</option>
+                    <option value="Ota, Ogun">Ota, Ogun</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col-md-3 d-grid">
+                <button type="button" id="btnSearchNow" class="btn btn-sky py-2.5 rounded-3">Find Trades</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main id="marketplace" class="py-5">
+    <div class="container">
+      <div id="wishlistMatchBanner" class="alert bg-sky-tint border border-sky rounded-4 p-3 mb-4 d-none">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <span class="badge bg-sky-primary me-2"><i class="bi bi-bell-fill"></i> Wishlist Alert</span>
+            <strong class="text-dark" id="wishlistMatchText">Matches found for your saved keywords!</strong>
+          </div>
+          <a href="dashboard.html" class="btn btn-outline-sky btn-sm">Manage Wishlist</a>
+        </div>
+      </div>
+
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div class="filter-scroll-row">
+          <button type="button" class="mode-pill active" data-mode="all">All Listings</button>
+          <button type="button" class="mode-pill" data-mode="Barter Only"><i class="bi bi-arrow-left-right me-1"></i> Trade by Barter</button>
+          <button type="button" class="mode-pill" data-mode="Cash or Swap"><i class="bi bi-cash-coin me-1"></i> Cash or Swap</button>
+          <button type="button" class="mode-pill" data-mode="Pawn / Quick Sale"><i class="bi bi-stopwatch me-1"></i> Pawn / Quick Sale</button>
+          <button type="button" class="mode-pill" data-mode="favorites" id="favFilterPill"><i class="bi bi-heart-fill text-danger me-1"></i> Saved Favorites (<span id="favCountBadge">0</span>)</button>
+        </div>
+        <div class="text-muted small fw-semibold">
+          Showing <span id="itemCount" class="text-dark fw-bold">0</span> active items
+        </div>
+      </div>
+
+      <div class="filter-scroll-row mb-4 pb-2 border-bottom">
+        <button type="button" class="cat-pill active" data-category="all">All Categories</button>
+        <button type="button" class="cat-pill" data-category="Furniture">Furniture</button>
+        <button type="button" class="cat-pill" data-category="Electronics & Phones">Electronics &amp; Phones</button>
+        <button type="button" class="cat-pill" data-category="Home Appliances">Home Appliances</button>
+        <button type="button" class="cat-pill" data-category="Vehicles & Bikes">Vehicles &amp; Bikes</button>
+        <button type="button" class="cat-pill" data-category="Fashion & Watches">Fashion &amp; Watches</button>
+      </div>
+
+      <div class="row g-4" id="listingsGrid"></div>
+
+      <div id="emptyState" class="text-center py-5 d-none">
+        <div class="step-icon mx-auto mb-3"><i class="bi bi-box-seam"></i></div>
+        <h5 class="fw-bold">No matching items found</h5>
+        <p class="text-muted mb-3">Try clearing your filters or post this item for barter.</p>
+        <button type="button" class="btn btn-sky px-4" onclick="handlePostClick()">Post an Item Now</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="py-5 border-top bg-white">
+    <div class="container">
+      <div class="row g-4 pb-4 border-bottom">
+        <div class="col-lg-4">
+          <div class="d-flex align-items-center gap-2 fw-bold fs-5 mb-2">
+            <span class="brand-logo-wrap" style="width:32px;height:32px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M20 7L16 3M20 7L16 11M20 7H9C6.79086 7 5 8.79086 5 11V12" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 17L8 21M4 17L8 13M4 17H15C17.2091 17 19 15.2091 19 13V12" stroke="#E0F2FE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span>DFQ <span class="text-sky">Trade Crow</span></span>
+          </div>
+          <p class="small text-secondary mb-3">
+            Nigeria&rsquo;s trusted peer-to-peer barter, cash-top-up, and receipt-verified digital pawn marketplace. Built for transparent, safe, and family-friendly exchanges.
+          </p>
+          <div class="d-flex flex-wrap gap-2 small">
+            <span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1.5"><i class="bi bi-shield-fill-check me-1"></i>NDPR Compliant</span>
+            <span class="badge bg-sky-light text-sky border border-info-subtle px-2.5 py-1.5"><i class="bi bi-qr-code-scan me-1"></i>IMEI Anti-Theft</span>
+            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2.5 py-1.5"><i class="bi bi-lock-fill me-1"></i>Escrow Protected</span>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-4 col-lg-2">
+          <h6 class="fw-bold text-dark small text-uppercase mb-3">Marketplace</h6>
+          <ul class="list-unstyled small d-flex flex-column gap-2 mb-0">
+            <li><a href="#marketplace" class="text-secondary text-decoration-none">Browse All Swaps</a></li>
+            <li><a href="#" class="text-secondary text-decoration-none" onclick="handlePostClick(); return false;">Post an Item</a></li>
+            <li><a href="dashboard.html" class="text-secondary text-decoration-none">My Trade Desk</a></li>
+            <li><a href="#" class="text-secondary text-decoration-none" data-bs-toggle="modal" data-bs-target="#serialCheckModal">Verify Serial / IMEI</a></li>
+            <li><a href="#" class="text-secondary text-decoration-none" onclick="openKycModal(); return false;">KYC / OTP Verification</a></li>
+          </ul>
+        </div>
+
+        <div class="col-6 col-md-4 col-lg-3">
+          <h6 class="fw-bold text-dark small text-uppercase mb-3">Legal &amp; Policies</h6>
+          <ul class="list-unstyled small d-flex flex-column gap-2 mb-0">
+            <li><a href="legal.html#refund" class="text-secondary text-decoration-none" onclick="openLegalModal('refund'); return false;"><i class="bi bi-arrow-counterclockwise text-sky me-1"></i>Refund &amp; Escrow Policy</a></li>
+            <li><a href="legal.html#terms" class="text-secondary text-decoration-none" onclick="openLegalModal('terms'); return false;"><i class="bi bi-file-earmark-text text-sky me-1"></i>Terms &amp; Conditions</a></li>
+            <li><a href="legal.html#privacy" class="text-secondary text-decoration-none" onclick="openLegalModal('privacy'); return false;"><i class="bi bi-shield-lock text-sky me-1"></i>Privacy Policy (NDPR)</a></li>
+            <li><a href="legal.html#pawn" class="text-secondary text-decoration-none" onclick="openLegalModal('pawn'); return false;"><i class="bi bi-receipt text-sky me-1"></i>Pawn &amp; Anti-Theft Policy</a></li>
+            <li><a href="legal.html#safety" class="text-secondary text-decoration-none" onclick="openLegalModal('safety'); return false;"><i class="bi bi-people text-sky me-1"></i>Safe Meetup &amp; Family Rules</a></li>
+          </ul>
+        </div>
+
+        <div class="col-md-4 col-lg-3">
+          <h6 class="fw-bold text-dark small text-uppercase mb-3">Trust &amp; Support</h6>
+          <ul class="list-unstyled small text-secondary d-flex flex-column gap-2 mb-0">
+            <li><i class="bi bi-geo-alt-fill text-sky me-1"></i> Lagos &amp; Abuja Swap Hubs, Nigeria</li>
+            <li><i class="bi bi-envelope-fill text-sky me-1"></i> support@dfqtradecrow.com</li>
+            <li><i class="bi bi-shield-exclamation text-sky me-1"></i> legal@dfqtradecrow.com</li>
+            <li class="pt-1">
+              <a href="legal.html" class="btn btn-outline-sky btn-sm rounded-3 fw-semibold">
+                <i class="bi bi-journal-check me-1"></i>Full Legal Center Page
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center pt-3 small text-secondary gap-2">
+        <span>&copy; 2026 DFQ Trade Crow. All rights reserved.</span>
+        <span>
+          <a href="legal.html#refund" class="text-secondary text-decoration-none me-3" onclick="openLegalModal('refund'); return false;">Refund Policy</a>
+          <a href="legal.html#terms" class="text-secondary text-decoration-none me-3" onclick="openLegalModal('terms'); return false;">Terms</a>
+          <a href="legal.html#privacy" class="text-secondary text-decoration-none" onclick="openLegalModal('privacy'); return false;">Privacy</a>
+        </span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- MODAL 1: AUTH -->
+  <div class="modal fade" id="authModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow">
+        <div class="modal-header bg-sky-tint border-bottom px-4 py-3">
+          <h5 class="modal-title fw-bold" id="authModalTitle">Log In to DFQ Trade Crow</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          <ul class="nav nav-pills nav-fill mb-4 bg-light p-1 rounded-3">
+            <li class="nav-item"><button type="button" class="nav-link active rounded-3 fw-semibold" id="tabLoginBtn" onclick="switchAuthTab('login')">Log In</button></li>
+            <li class="nav-item"><button type="button" class="nav-link rounded-3 fw-semibold" id="tabRegisterBtn" onclick="switchAuthTab('register')">Create Account</button></li>
+          </ul>
+          <form id="loginForm">
+            <div class="mb-3"><label class="form-label small fw-semibold">Email Address</label><input type="email" class="form-control" id="loginEmail" required /></div>
+            <div class="mb-3"><label class="form-label small fw-semibold">Password</label><input type="password" class="form-control" id="loginPassword" required /></div>
+            <div class="d-grid"><button type="submit" class="btn btn-sky py-2.5">Log In</button></div>
+          </form>
+          <form id="registerForm" class="d-none">
+            <div class="mb-3"><label class="form-label small fw-semibold">Full Name</label><input type="text" class="form-control" id="regName" required /></div>
+            <div class="mb-3"><label class="form-label small fw-semibold">Email Address</label><input type="email" class="form-control" id="regEmail" required /></div>
+            <div class="row g-2 mb-3">
+              <div class="col-6"><label class="form-label small fw-semibold">Phone / WhatsApp</label><input type="text" class="form-control" id="regPhone" required /></div>
+              <div class="col-6"><label class="form-label small fw-semibold">Location</label>
+                <select class="form-select" id="regLocation">
+                  <option value="Lekki, Lagos">Lekki, Lagos</option><option value="Yaba, Lagos">Yaba, Lagos</option>
+                  <option value="Ikeja, Lagos">Ikeja, Lagos</option><option value="Abuja">Abuja</option><option value="Ota, Ogun">Ota, Ogun</option>
+                </select>
+              </div>
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-6"><label class="form-label small fw-semibold">Password (min 6)</label><input type="password" class="form-control" id="regPassword" minlength="6" required /></div>
+              <div class="col-6"><label class="form-label small fw-semibold">Referral Code (Optional)</label><input type="text" class="form-control" id="regRefCode" placeholder="e.g., DFQ-A1B2C3" /></div>
+            </div>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="regLegalAgree" checked required />
+              <label class="form-check-label small text-secondary" for="regLegalAgree">
+                I am 18+ (or supervised by a parent/guardian) and agree to the
+                <a href="#" class="text-sky fw-semibold text-decoration-none" onclick="openLegalModal('terms'); return false;">Terms of Service</a>,
+                <a href="#" class="text-sky fw-semibold text-decoration-none" onclick="openLegalModal('refund'); return false;">Refund &amp; Escrow Policy</a>, and
+                <a href="#" class="text-sky fw-semibold text-decoration-none" onclick="openLegalModal('privacy'); return false;">Privacy Policy</a>.
+              </label>
+            </div>
+            <div class="d-grid"><button type="submit" class="btn btn-sky py-2.5">Create Free Account</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: POST NEW ITEM -->
+  <div class="modal fade" id="postItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow">
+        <div class="modal-header border-bottom px-4 py-3 bg-sky-tint rounded-top-4">
+          <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle-fill text-sky me-2"></i>Post an Item on DFQ Trade Crow</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="postItemForm" enctype="multipart/form-data">
+          <div class="modal-body p-4">
+            <div class="row g-3">
+              <div class="col-md-8"><label class="form-label fw-semibold small">Item Title</label><input type="text" class="form-control" name="title" placeholder="e.g., 3-Seater Grey Fabric Couch or iPhone 14" required /></div>
+              <div class="col-md-4"><label class="form-label fw-semibold small">Category</label>
+                <select class="form-select" name="category" required>
+                  <option value="Furniture">Furniture</option><option value="Electronics & Phones">Electronics &amp; Phones</option>
+                  <option value="Home Appliances">Home Appliances</option><option value="Vehicles & Bikes">Vehicles &amp; Bikes</option><option value="Fashion & Watches">Fashion &amp; Watches</option>
+                </select>
+              </div>
+              <div class="col-md-4"><label class="form-label fw-semibold small">Listing Type</label>
+                <select class="form-select" name="mode" id="postModeSelect" required>
+                  <option value="Barter Only">Barter Only</option><option value="Cash or Swap">Cash or Swap</option><option value="Pawn / Quick Sale">Pawn / Quick Sale</option>
+                </select>
+              </div>
+              <div class="col-md-4"><label class="form-label fw-semibold small">Condition</label>
+                <select class="form-select" name="item_condition" required>
+                  <option value="Neatly Used">Neatly Used</option><option value="Brand New">Brand New</option><option value="Fair / Working">Fair / Working</option>
+                </select>
+              </div>
+              <div class="col-md-4"><label class="form-label fw-semibold small">Location</label>
+                <select class="form-select" name="location" required>
+                  <option value="Lekki, Lagos">Lekki, Lagos</option><option value="Yaba, Lagos">Yaba, Lagos</option>
+                  <option value="Ikeja, Lagos">Ikeja, Lagos</option><option value="Abuja">Abuja</option><option value="Ota, Ogun">Ota, Ogun</option>
+                </select>
+              </div>
+
+              <div class="col-12 d-none" id="pawnFieldsBox">
+                <div class="p-3 rounded-3 bg-warning-subtle border border-warning">
+                  <div class="fw-bold small text-dark mb-2"><i class="bi bi-calculator me-1"></i> Pawn Buyback Terms (10% Standard Fee)</div>
+                  <div class="row g-2">
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Pawn Cash Requested (₦)</label><input type="number" class="form-control form-control-sm" name="pawn_advance" id="pawnAdvanceInput" /></div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Hold Window</label>
+                      <select class="form-select form-select-sm" name="pawn_days"><option value="14">14 Days</option><option value="21">21 Days</option><option value="30">30 Days</option></select>
+                    </div>
+                    <div class="col-md-4"><label class="form-label small fw-semibold">Calculated Buyback</label><div class="form-control form-control-sm bg-white fw-bold text-sky" id="pawnBuybackPreview">₦0</div></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="p-3 rounded-3 bg-sky-tint border border-sky">
+                  <label class="form-label fw-bold small text-sky mb-1"><i class="bi bi-arrow-left-right me-1"></i> What Do You Want in Exchange?</label>
+                  <input type="text" class="form-control" name="wanted" placeholder="e.g., Queen Size Bed Frame + Mattress OR ₦160,000" required />
+                </div>
+              </div>
+
+              <div class="col-md-6"><label class="form-label fw-semibold small">Estimated Value (₦)</label><input type="number" class="form-control" name="est_value" placeholder="e.g., 150000" required /></div>
+              <div class="col-md-6"><label class="form-label fw-semibold small">Item Photos (Up to 4 images, Max 5MB each)</label><input type="file" class="form-control" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple required /></div>
+
+              <div class="col-md-6"><label class="form-label fw-semibold small">Serial Number / IMEI (Optional Anti-Theft Check)</label><input type="text" class="form-control" name="serial_imei" placeholder="e.g., 356789012345678" /></div>
+              <div class="col-md-6"><label class="form-label fw-semibold small">Purchase Receipt (Optional &bull; Grants Verified Badge)</label><input type="file" class="form-control" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf" /></div>
+
+              <div class="col-12"><label class="form-label fw-semibold small">Item Description</label><textarea class="form-control" name="description" rows="2" required></textarea></div>
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="postOwnershipAgree" checked required />
+                  <label class="form-check-label small text-secondary" for="postOwnershipAgree">
+                    I confirm I am the lawful owner of this item, it is not stolen or locked, and I accept the
+                    <a href="#" class="text-sky fw-semibold text-decoration-none" onclick="openLegalModal('pawn'); return false;">Anti-Theft &amp; Pawn Rules</a> and
+                    <a href="#" class="text-sky fw-semibold text-decoration-none" onclick="openLegalModal('refund'); return false;">Refund Policy</a>.
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer border-top px-4 py-3">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-sky px-4" id="btnSubmitItem">Publish Listing</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: PROPOSE SWAP -->
+  <div class="modal fade" id="swapOfferModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow">
+        <div class="modal-header border-bottom px-4 py-3 bg-sky-tint rounded-top-4">
+          <h5 class="modal-title fw-bold"><i class="bi bi-arrow-left-right text-sky me-2"></i>Propose a Trade / Offer</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="swapOfferForm">
+          <div class="modal-body p-4">
+            <input type="hidden" id="offerTargetItemId" />
+            <div class="p-3 rounded-3 bg-light border mb-3">
+              <div class="small text-muted">You are making an offer for:</div>
+              <div class="fw-bold text-dark" id="offerTargetTitle">Item Name</div>
+              <div class="small text-sky fw-semibold mt-1" id="offerTargetWanted">Owner wants: ...</div>
+            </div>
+            <div class="mb-3"><label class="form-label fw-semibold small">What item are you offering in exchange?</label><input type="text" class="form-control" id="offerItem" required /></div>
+            <div class="mb-3"><label class="form-label fw-semibold small">Cash Top-Up / Cash Offer (Optional)</label><input type="text" class="form-control" id="offerCash" placeholder="e.g., + ₦20,000 cash top-up" /></div>
+            <div class="mb-0"><label class="form-label fw-semibold small">Note to Owner</label><textarea class="form-control" id="offerNote" rows="2"></textarea></div>
+          </div>
+          <div class="modal-footer border-top px-4 py-3">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+            <button type="submit" class="btn btn-sky px-4">Send Trade Proposal</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: ITEM DETAILS -->
+  <div class="modal fade" id="itemDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow overflow-hidden">
+        <div class="row g-0">
+          <div class="col-md-6 bg-dark d-flex align-items-center">
+            <div id="detailCarousel" class="carousel slide w-100" data-bs-ride="false">
+              <div class="carousel-inner" id="detailCarouselInner"></div>
+              <button class="carousel-control-prev" type="button" data-bs-target="#detailCarousel" data-bs-slide="prev"><span class="carousel-control-prev-icon"></span></button>
+              <button class="carousel-control-next" type="button" data-bs-target="#detailCarousel" data-bs-slide="next"><span class="carousel-control-next-icon"></span></button>
+            </div>
+          </div>
+          <div class="col-md-6 p-4 d-flex flex-column justify-content-between">
+            <div>
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                  <span id="detailBadge" class="badge bg-sky-primary">Barter Only</span>
+                  <span id="detailReceiptBadge" class="badge bg-success ms-1 d-none"><i class="bi bi-patch-check-fill"></i> Receipt Verified</span>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <h4 class="fw-bold mb-1" id="detailTitle">Item Title</h4>
+              <p class="text-muted small mb-2">
+                <i class="bi bi-geo-alt-fill text-sky"></i> <span id="detailLocation">Location</span> &bull; <span id="detailCondition">Condition</span>
+              </p>
+              <div class="mb-2 small">
+                <a href="#" id="detailTraderLink" class="fw-bold text-sky text-decoration-none">View Trader Storefront</a>
+                <span class="text-warning-emphasis fw-semibold ms-2" id="detailRatingBadge"></span>
+              </div>
+              <div class="exchange-box mb-3">
+                <span class="exchange-label">Owner Wants in Exchange:</span>
+                <div class="exchange-value" id="detailWanted">Wanted Item</div>
+              </div>
+              <div id="detailPawnInfo" class="alert alert-warning py-2 px-3 small d-none"></div>
+              <p class="small text-secondary mb-3" id="detailDesc">Description</p>
+              <div class="border-top pt-2 small">
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Estimated Value:</span><span class="fw-bold text-dark" id="detailValue">₦0</span></div>
+                <div class="d-flex justify-content-between py-1"><span class="text-muted">Serial / IMEI:</span><span class="fw-semibold text-dark" id="detailSerial">Not provided</span></div>
+              </div>
+            </div>
+            <div class="d-grid gap-2 mt-3">
+              <button type="button" class="btn btn-sky" id="detailProposeBtn"><i class="bi bi-arrow-left-right me-1"></i> Propose a Swap</button>
+              <div class="d-flex gap-2">
+                <a href="#" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm flex-grow-1" id="detailWhatsappBtn"><i class="bi bi-whatsapp me-1"></i> Chat Seller</a>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="detailShareBtn"><i class="bi bi-share me-1"></i> Share Status</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" id="detailReportBtn" title="Report suspicious item"><i class="bi bi-flag"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: SERIAL / IMEI ANTI-THEFT VERIFIER -->
+  <div class="modal fade" id="serialCheckModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow">
+        <div class="modal-header bg-sky-tint border-bottom px-4 py-3">
+          <h5 class="modal-title fw-bold"><i class="bi bi-qr-code-scan text-sky me-2"></i>Verify Device Serial / IMEI</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          <p class="small text-muted">Before swapping or buying an electronics/pawn item, check its Serial Number or IMEI against DFQ Trade Crow records.</p>
+          <form id="serialCheckForm" class="d-flex gap-2 mb-3">
+            <input type="text" class="form-control" id="serialQueryInput" placeholder="Enter Serial Number or 15-digit IMEI..." required />
+            <button type="submit" class="btn btn-sky px-3">Check</button>
+          </form>
+          <div id="serialCheckResult" class="small"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 6: NIN / BVN / PHONE OTP TRADER VERIFICATION -->
+  <div class="modal fade" id="kycVerifyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow">
+        <div class="modal-header bg-sky-tint border-bottom px-4 py-3">
+          <h5 class="modal-title fw-bold"><i class="bi bi-patch-check-fill text-success me-2"></i>Trader KYC &amp; Phone OTP Verification</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          <div id="kycAlreadyVerifiedBox" class="alert alert-success rounded-3 d-none mb-3">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-shield-fill-check fs-4"></i>
+              <div>
+                <div class="fw-bold">KYC Verified Trader Badge Active!</div>
+                <div class="small" id="kycVerifiedSummary">Verified via Phone OTP &amp; Identity Check.</div>
+              </div>
+            </div>
+          </div>
+          <p class="small text-muted mb-3">Earn a green <strong>KYC Verified Trader</strong> badge on your profile and listings so buyers and swap partners trust high-value trades faster.</p>
+          <form id="kycVerifyForm">
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Verification Method</label>
+              <select class="form-select" id="kycMethodSelect">
+                <option value="Phone OTP + NIN">Phone OTP + National ID (NIN)</option>
+                <option value="Phone OTP + BVN">Phone OTP + Bank Verification (BVN)</option>
+                <option value="Phone SMS OTP Only">Phone Number SMS OTP Only</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Phone Number for OTP</label>
+              <div class="input-group">
+                <input type="tel" class="form-control" id="kycPhoneInput" placeholder="e.g. 08031234567" required />
+                <button type="button" class="btn btn-outline-sky fw-semibold" id="btnSendKycOtp">Send OTP</button>
+              </div>
+              <div class="form-text text-sky fw-semibold d-none" id="kycOtpHint"></div>
+            </div>
+            <div class="mb-3" id="kycIdFieldWrap">
+              <label class="form-label small fw-semibold">11-Digit NIN or BVN Number</label>
+              <input type="text" class="form-control" id="kycIdNumberInput" maxlength="11" pattern="[0-9]{11}" placeholder="Enter 11-digit NIN or BVN" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">6-Digit OTP Code</label>
+              <input type="text" class="form-control" id="kycOtpCodeInput" maxlength="6" placeholder="Enter 6-digit code sent to your phone" required />
+            </div>
+            <button type="submit" class="btn btn-success w-100 py-2.5 fw-bold rounded-3">
+              <i class="bi bi-patch-check-fill me-1"></i> Verify &amp; Activate Trader Badge
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 7: LEGAL, REFUND & TRUST POLICIES -->
+  <div class="modal fade" id="legalPolicyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content border-0 rounded-4 shadow">
+        <div class="modal-header bg-sky-tint border-bottom px-4 py-3">
+          <h5 class="modal-title fw-bold"><i class="bi bi-shield-fill-check text-sky me-2"></i>DFQ Trade Crow Legal, Refund &amp; Trust Center</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          
+          <ul class="nav nav-pills nav-fill gap-2 mb-4 bg-light p-2 rounded-3" id="legalPolicyTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active fw-semibold small" id="tab-refund" data-bs-toggle="pill" data-bs-target="#pane-refund" type="button" role="tab">Refund &amp; Escrow Policy</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-semibold small" id="tab-terms" data-bs-toggle="pill" data-bs-target="#pane-terms" type="button" role="tab">Terms of Service</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-semibold small" id="tab-privacy" data-bs-toggle="pill" data-bs-target="#pane-privacy" type="button" role="tab">Privacy Policy (NDPR)</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-semibold small" id="tab-pawn" data-bs-toggle="pill" data-bs-target="#pane-pawn" type="button" role="tab">Pawn &amp; Anti-Theft Rules</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-semibold small" id="tab-safety" data-bs-toggle="pill" data-bs-target="#pane-safety" type="button" role="tab">Safe Meetup &amp; Family Rules</button>
+            </li>
+          </ul>
+
+          <div class="tab-content" id="legalPolicyTabContent">
+            <!-- 1. REFUND & ESCROW POLICY -->
+            <div class="tab-pane fade show active" id="pane-refund" role="tabpanel">
+              <div class="p-3 rounded-3 bg-sky-tint border border-sky mb-3">
+                <div class="fw-bold text-dark"><i class="bi bi-shield-check text-sky me-1"></i> DFQ Trade Crow Refund, Inspection &amp; Escrow Policy</div>
+                <div class="small text-secondary">Effective Date: November 2026 &bull; Applies to all Barter, Cash-Top-Up, Spotlight Boosts &amp; Pawn Transactions</div>
+              </div>
+              <h6 class="fw-bold text-dark">1. Peer-to-Peer Direct Barter &amp; Cash Swaps</h6>
+              <p class="small text-secondary">DFQ Trade Crow operates as a peer-to-peer exchange marketplace. For direct in-person swaps completed outside Escrow Hold, traders are required to inspect items thoroughly (including Serial/IMEI verification and physical testing) before handing over goods or cash. Once both parties confirm physical handover in person, direct peer-to-peer swaps are final unless misrepresentation or stolen property is proven.</p>
+              <h6 class="fw-bold text-dark">2. Escrow Hold &amp; Inspection Refund Guarantee (100% Refundable Before Release)</h6>
+              <p class="small text-secondary">When a cash top-up or purchase is placed under <strong>DFQ Inspection Escrow Hold</strong>, funds are safeguarded until the receiving party inspects and approves the item within the agreed <strong>24-to-48-hour inspection window</strong>:</p>
+              <ul class="small text-secondary">
+                <li><strong>Full Refund Eligibility:</strong> If the delivered item is significantly not as described, defective, locked (e.g., iCloud/FRP locked), or fails Serial/IMEI verification, the buyer/swapper may raise a dispute before releasing escrow to receive a <strong>100% refund</strong> of the escrowed amount upon verified return of the item.</li>
+                <li><strong>Cancelled Trades Before Dispatch:</strong> If either party cancels a trade before physical dispatch or meetup, any escrowed cash top-up is refunded in full within <strong>1–3 business days</strong>.</li>
+              </ul>
+              <h6 class="fw-bold text-dark">3. Digital Pawn Tickets &amp; Buyback Window</h6>
+              <p class="small text-secondary">Pawn transactions carry a fixed <strong>14, 21, or 30-day buyback window</strong> with a transparent 10% service fee stated upfront on the printable Pawn Ticket (<code>ticket.php</code>). If a pawned item is redeemed on or before the due date, full ownership returns immediately upon buyback settlement. Pawn service fees are non-refundable once the cash advance has been disbursed.</p>
+              <h6 class="fw-bold text-dark">4. Spotlight Boost Credits &amp; Platform Fees</h6>
+              <p class="small text-secondary mb-0">Spotlight Boost credits used to feature listings at the top of the marketplace are non-refundable once activated on a live listing, except where a technical outage prevented the listing from displaying.</p>
+            </div>
+
+            <!-- 2. TERMS OF SERVICE -->
+            <div class="tab-pane fade" id="pane-terms" role="tabpanel">
+              <div class="p-3 rounded-3 bg-sky-tint border border-sky mb-3">
+                <div class="fw-bold text-dark"><i class="bi bi-file-earmark-text text-sky me-1"></i> Terms &amp; Conditions of Use</div>
+                <div class="small text-secondary">Governing Law: Federal Republic of Nigeria &bull; Platform Operator: DFQ Trade Crow</div>
+              </div>
+              <h6 class="fw-bold text-dark">1. Eligibility &amp; Family Supervision</h6>
+              <p class="small text-secondary">While minors and families may browse listings on DFQ Trade Crow, creating an account, executing binding barter contracts, submitting NIN/BVN KYC verification, or entering pawn agreements is strictly restricted to individuals aged <strong>18 years and older</strong> (or minors trading strictly under the direct supervision and verified account of a parent or legal guardian).</p>
+              <h6 class="fw-bold text-dark">2. Lawful Ownership &amp; Accurate Listings</h6>
+              <p class="small text-secondary">By posting an item on DFQ Trade Crow, you warrant that you are the sole lawful owner of the item, that it is free of undisclosed liens, theft reports, or carrier/cloud locks, and that all photos, battery health metrics, mileage, and descriptions are truthful.</p>
+              <h6 class="fw-bold text-dark">3. Prohibited Items</h6>
+              <p class="small text-secondary">The following items are strictly banned from DFQ Trade Crow: stolen or untraceable electronics, counterfeit currency or documents, firearms, ammunition, explosives, illicit drugs, hazardous chemicals, wildlife products, and adult/explicit materials. Violating accounts are permanently suspended and reported to law enforcement.</p>
+              <h6 class="fw-bold text-dark">4. Dispute Resolution</h6>
+              <p class="small text-secondary mb-0">In the event of a trade dispute, both parties agree to submit transaction logs, chat records, Pawn Ticket IDs, and Serial/IMEI evidence to DFQ Trade Crow Moderation for good-faith mediation prior to initiating external legal proceedings in Lagos State, Nigeria.</p>
+            </div>
+
+            <!-- 3. PRIVACY POLICY (NDPR) -->
+            <div class="tab-pane fade" id="pane-privacy" role="tabpanel">
+              <div class="p-3 rounded-3 bg-sky-tint border border-sky mb-3">
+                <div class="fw-bold text-dark"><i class="bi bi-lock-fill text-sky me-1"></i> Privacy &amp; Data Protection Policy (NDPR Compliant)</div>
+                <div class="small text-secondary">Aligned with the Nigeria Data Protection Act (NDPA) &amp; NDPR Standards</div>
+              </div>
+              <h6 class="fw-bold text-dark">1. Information We Collect</h6>
+              <p class="small text-secondary">We collect only the information required to operate a safe peer-to-peer marketplace: your name, email address, phone/WhatsApp number, city/area location, uploaded listing photos, optional purchase receipts, and device Serial/IMEI numbers.</p>
+              <h6 class="fw-bold text-dark">2. How NIN, BVN &amp; Phone OTP Data Are Protected</h6>
+              <p class="small text-secondary">When you verify your trader identity via <strong>NIN, BVN, or Phone SMS OTP</strong>, your verification number is used strictly to confirm identity authenticity and generate a masked confirmation status (e.g., <code>221*****894</code>). We never sell, rent, or publicly display your full NIN, BVN, or raw password to other users.</p>
+              <h6 class="fw-bold text-dark">3. Cookies &amp; Local Preferences</h6>
+              <p class="small text-secondary">DFQ Trade Crow uses essential session cookies and browser storage to keep you logged in, remember your Dark/Light theme choice, and store your Saved Favorites Watchlist.</p>
+              <h6 class="fw-bold text-dark">4. Your Data Rights</h6>
+              <p class="small text-secondary mb-0">You may request access to, correction of, or permanent deletion of your account data and uploaded receipts at any time via your Trade Desk or by contacting our Data Protection Officer at <code>legal@dfqtradecrow.com</code>.</p>
+            </div>
+
+            <!-- 4. PAWN & ANTI-THEFT POLICY -->
+            <div class="tab-pane fade" id="pane-pawn" role="tabpanel">
+              <div class="p-3 rounded-3 bg-sky-tint border border-sky mb-3">
+                <div class="fw-bold text-dark"><i class="bi bi-qr-code-scan text-sky me-1"></i> Anti-Theft, Serial/IMEI &amp; Digital Pawn Compliance</div>
+                <div class="small text-secondary">Zero-Tolerance Stolen Goods &amp; Transparent Buyback Charter</div>
+              </div>
+              <h6 class="fw-bold text-dark">1. Mandatory Serial / IMEI &amp; Receipt Screening</h6>
+              <p class="small text-secondary">All smartphones, laptops, consoles, generators, and vehicles listed for Pawn or high-value swap are subject to Serial Number / IMEI / VIN lookup. Any device flagged as lost or stolen is immediately locked from trading and its audit trail preserved for law enforcement verification.</p>
+              <h6 class="fw-bold text-dark">2. Digital Pawn Ticket Transparency</h6>
+              <p class="small text-secondary">Every pawn agreement generates a timestamped Digital Pawn Ticket recording the principal advance, the flat 10% fee, the exact maturity date, and serial identifiers—protecting both the pawner's right to redeem and the lender's collateral security.</p>
+              <h6 class="fw-bold text-dark">3. Default &amp; Collateral Liquidation</h6>
+              <p class="small text-secondary mb-0">If a pawner fails to redeem or request a mutually agreed extension before the expiration of the 14, 21, or 30-day hold window, the collateral item may be relisted for outright sale to recover the principal advance.</p>
+            </div>
+
+            <!-- 5. SAFE MEETUP & FAMILY RULES -->
+            <div class="tab-pane fade" id="pane-safety" role="tabpanel">
+              <div class="p-3 rounded-3 bg-sky-tint border border-sky mb-3">
+                <div class="fw-bold text-dark"><i class="bi bi-people-fill text-sky me-1"></i> Safe Meetup &amp; Community Safety Guidelines</div>
+                <div class="small text-secondary">Protecting Traders, Parents &amp; Young Visitors</div>
+              </div>
+              <h6 class="fw-bold text-dark">1. Always Meet in Well-Lit Public Places</h6>
+              <p class="small text-secondary">Conduct physical swaps and inspections during daylight hours at busy, CCTV-monitored public locations such as shopping malls, bank premises, or verified hub spots. Never invite strangers to private residences for unverified deals.</p>
+              <h6 class="fw-bold text-dark">2. Test Before You Hand Over</h6>
+              <p class="small text-secondary">Check IMEI numbers (<code>*#06#</code>), verify iCloud/Google account sign-out, test battery charging, and confirm bank transfers inside your own banking app (never rely solely on SMS alerts) before releasing your item.</p>
+              <h6 class="fw-bold text-dark">3. Youth &amp; Family Protection</h6>
+              <p class="small text-secondary mb-0">Parents and guardians must accompany any minor under 18 during physical item pickups or swaps. Report any suspicious listing or behavior immediately using the red Flag icon on any listing modal.</p>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer border-top px-4 py-3 justify-content-between">
+          <a href="legal.html" class="btn btn-outline-sky btn-sm"><i class="bi bi-box-arrow-up-right me-1"></i>Open Full Printable Legal Page</a>
+          <button type="button" class="btn btn-sky px-4" data-bs-dismiss="modal">I Understand</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+    <div id="liveToast" class="toast align-items-center text-bg-dark border-0 rounded-3 shadow" role="alert">
+      <div class="d-flex">
+        <div class="toast-body d-flex align-items-center gap-2"><i class="bi bi-check-circle-fill text-sky fs-5"></i><span id="toastMessage">Done!</span></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="module" src="/assets/js/app.js"></script>
+  <script>
+  (function () {
+    function syncThemeButtons(theme) {
+      document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
+        const icon = btn.querySelector("i");
+        const label = btn.querySelector(".theme-label");
+        if (theme === "dark") {
+          if (icon) icon.className = "bi bi-sun-fill text-warning";
+          if (label) label.textContent = "Light";
+          btn.setAttribute("title", "Switch to Light Theme");
+        } else {
+          if (icon) icon.className = "bi bi-moon-stars-fill";
+          if (label) label.textContent = "Dark";
+          btn.setAttribute("title", "Switch to Dark Theme");
+        }
+      });
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute("data-bs-theme", theme);
+      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem("dfq_theme_mode", theme);
+      syncThemeButtons(theme);
+    }
+
+    window.toggleDfqTheme = function () {
+      const current = document.documentElement.getAttribute("data-theme") || "light";
+      applyTheme(current === "dark" ? "light" : "dark");
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const current = document.documentElement.getAttribute("data-theme") || "light";
+      syncThemeButtons(current);
+      document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
+        btn.addEventListener("click", window.toggleDfqTheme);
+      });
+    });
+  })();
+</script>
+</body>
+</html>

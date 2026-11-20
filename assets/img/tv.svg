@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <rect width="800" height="500" fill="#E0F2FE"/>
+  <rect x="155" y="95" width="490" height="275" rx="14" fill="#0F172A" stroke="#38BDF8" stroke-width="4"/>
+  <rect x="170" y="110" width="460" height="245" rx="6" fill="#0284C7"/>
+  <path d="M330 370 L300 415 H500 L470 370 Z" fill="#334155"/>
+  <text x="400" y="238" font-family="sans-serif" font-size="28" font-weight="800" fill="#FFFFFF" text-anchor="middle">65" 4K UHD SMART OLED TV</text>
+  <text x="400" y="456" font-family="sans-serif" font-size="19" font-weight="700" fill="#0F172A" text-anchor="middle">Home Cinema Smart TV • Barter or Swap</text>
+</svg>

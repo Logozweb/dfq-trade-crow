@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Production build
+dist/
+
+# SQLite database files
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# User uploads (keep directory with .gitkeep)
+uploads/item_*
+uploads/receipt_*
+
+# Environment & OS
+.env
+.env.local
+.DS_Store
+Thumbs.db
+
+# Legacy duplicate extraction folder
+dfq-trade-crow/

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Moderation | DFQ Trade Crow</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+  <link href="assets/css/style.css" rel="stylesheet" />
+  <script>
+    (function () {
+      const saved = localStorage.getItem("dfq_theme_mode");
+      const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const theme = saved || (prefersDark ? "dark" : "light");
+      document.documentElement.setAttribute("data-bs-theme", theme);
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+</head>
+<body>
+  <nav class="navbar bg-white border-bottom py-3">
+    <div class="container d-flex justify-content-between align-items-center">
+      <a class="navbar-brand fw-bold" href="index.html">DFQ <span class="text-sky">Trade Crow</span> <span class="badge bg-dark ms-2">Admin</span></a>
+      <div class="d-flex align-items-center gap-2">
+        <a href="index.html" class="btn btn-outline-sky btn-sm">Back to Marketplace</a>
+        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-inline-flex align-items-center gap-1" data-theme-toggle title="Toggle Dark/Light Theme">
+          <i class="bi bi-moon-stars-fill"></i><span class="theme-label d-none d-sm-inline">Dark</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container py-4" id="adminContainer">
+    <div class="text-center py-5">
+      <div class="spinner-border text-sky" role="status"></div>
+      <p class="text-muted mt-2">Checking administrator credentials...</p>
+    </div>
+  </div>
+
+  <script>
+    let currentAdminId = null;
+
+    async function checkAuthAndLoadData() {
+      const container = document.getElementById('adminContainer');
+
+      try {
+        const meRes = await fetch('/api/auth/me');
+        const meData = await meRes.json();
+
+        if (!meData.authenticated || !meData.user || Number(meData.user.is_admin) !== 1) {
+          container.innerHTML = `
+            <div class="alert alert-warning rounded-4 p-4 shadow-sm">
+              <h5 class="fw-bold"><i class="bi bi-shield-lock-fill me-2"></i>Admin Access Required</h5>
+              <p class="mb-3">You must be logged in as an administrator to access the moderation panel.</p>
+              <div class="d-flex gap-2">
+                <a href="index.html" class="btn btn-sky btn-sm">Log in on Marketplace</a>
+                <button onclick="loginAsDemoAdmin()" class="btn btn-outline-dark btn-sm">Quick Demo Admin Login</button>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        currentAdminId = meData.user.id;
+        loadAdminDashboard();
+      } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
+      }
+    }
+
+    async function loginAsDemoAdmin() {
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'demo@dfqtradecrow.com', password: 'password' })
+        });
+        const d = await res.json();
+        if (d.success) {
+          window.location.reload();
+        } else {
+          alert('Login failed: ' + d.message);
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function loadAdminDashboard() {
+      const container = document.getElementById('adminContainer');
+
+      try {
+        const res = await fetch('/api/admin/data');
+        const data = await res.json();
+
+        if (!data.success) {
+          container.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+          return;
+        }
+
+        const stats = data.stats;
+        const allItems = data.allItems || [];
+        const allUsers = data.allUsers || [];
+
+        let itemsRows = allItems.map(it => {
+          const isFlagged = Number(it.is_reported) === 1;
+          const trClass = isFlagged ? 'table-danger' : '';
+          const receiptLink = it.receipt_path ? `<a href="${it.receipt_path}" target="_blank" class="badge bg-success-subtle text-success text-decoration-none">View Receipt</a>` : `<span class="text-muted">None</span>`;
+          
+          let actionBtns = '';
+          if (it.status === 'Removed') {
+            actionBtns = `<button onclick="runAdminAction('restore_item', ${it.id})" class="btn btn-outline-success btn-sm py-0 px-2">Restore</button>`;
+          } else {
+            actionBtns = `
+              ${isFlagged ? `<button onclick="runAdminAction('restore_item', ${it.id})" class="btn btn-success btn-sm py-0 px-2 me-1">Clear Flag</button>` : ''}
+              <button onclick="runAdminAction('remove_item', ${it.id})" class="btn btn-outline-danger btn-sm py-0 px-2">Remove</button>
+            `;
+          }
+
+          return `
+            <tr class="${trClass}">
+              <td>#${it.id}</td>
+              <td><img src="${it.image_path}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;" onerror="this.src='assets/img/phone.svg'" /></td>
+              <td>
+                <div class="fw-bold">${it.title}</div>
+                <small class="text-muted font-monospace">${it.serial_imei || 'No Serial'}</small>
+                ${isFlagged ? `<div class="text-danger small mt-1"><strong>Reason:</strong> ${it.report_reason || 'Flagged by user'}</div>` : ''}
+              </td>
+              <td>
+                <div>${it.owner_name}</div>
+                <small class="text-muted">${it.owner_email}</small>
+              </td>
+              <td>${receiptLink}</td>
+              <td>
+                <span class="badge ${it.status === 'Active' ? 'bg-success-subtle text-success' : (it.status === 'Removed' ? 'bg-danger text-white' : 'bg-warning-subtle text-dark')}">${it.status}</span>
+                ${isFlagged ? `<span class="badge bg-danger ms-1">Reported</span>` : ''}
+              </td>
+              <td class="text-end">${actionBtns}</td>
+            </tr>
+          `;
+        }).join('');
+
+        let usersRows = allUsers.map(u => {
+          const isMe = u.id === currentAdminId;
+          const roleBadge = Number(u.is_admin) === 1 ? `<span class="badge bg-dark">Admin</span>` : `<span class="badge bg-light text-dark border">Trader</span>`;
+          const toggleBtn = isMe ? `<span class="text-muted small">You</span>` : `
+            <button onclick="runAdminAction('toggle_admin', ${u.id})" class="btn btn-sm btn-outline-secondary py-0 px-2">${Number(u.is_admin) === 1 ? 'Demote' : 'Make Admin'}</button>
+            <button onclick="addCredits(${u.id})" class="btn btn-sm btn-outline-primary py-0 px-2 ms-1">+Boosts</button>
+          `;
+
+          return `
+            <tr>
+              <td>#${u.id}</td>
+              <td><strong>${u.full_name}</strong></td>
+              <td>${u.email}</td>
+              <td>${u.phone}</td>
+              <td><span class="badge bg-light text-dark border">${u.referral_code}</span></td>
+              <td><span class="badge bg-warning-subtle text-dark">${u.spotlight_credits} credits</span></td>
+              <td>${roleBadge}</td>
+              <td class="text-end">${toggleBtn}</td>
+            </tr>
+          `;
+        }).join('');
+
+        container.innerHTML = `
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h3 class="fw-bold mb-1">DFQ Moderation Control Panel</h3>
+              <p class="text-muted mb-0">Overview of registered accounts, escrow listings, and IMEI security flags.</p>
+            </div>
+            <button onclick="loadAdminDashboard()" class="btn btn-outline-sky btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+          </div>
+
+          <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+              <div class="card border-0 shadow-sm rounded-4 p-3 bg-white">
+                <small class="text-muted">Registered Traders</small>
+                <h3 class="fw-bold mb-0">${stats.users}</h3>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="card border-0 shadow-sm rounded-4 p-3 bg-white">
+                <small class="text-muted">Total Listings</small>
+                <h3 class="fw-bold mb-0">${stats.items}</h3>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="card border-0 shadow-sm rounded-4 p-3 bg-white">
+                <small class="text-danger fw-semibold">Flagged / Reported</small>
+                <h3 class="fw-bold text-danger mb-0">${stats.reported}</h3>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="card border-0 shadow-sm rounded-4 p-3 bg-white">
+                <small class="text-muted">Completed Swaps</small>
+                <h3 class="fw-bold text-sky mb-0">${stats.swapped}</h3>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden bg-white">
+            <div class="card-header bg-white py-3 fw-bold border-bottom">Moderate Marketplace Listings &amp; Serial Flags (${allItems.length})</div>
+            <div class="table-responsive">
+              <table class="table align-middle mb-0 small">
+                <thead class="table-light">
+                  <tr><th>ID</th><th>Photo</th><th>Title &amp; Serial</th><th>Owner</th><th>Receipt</th><th>Status / Flag</th><th class="text-end">Action</th></tr>
+                </thead>
+                <tbody>
+                  ${itemsRows}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden bg-white">
+            <div class="card-header bg-white py-3 fw-bold border-bottom">Manage Registered Traders &amp; Spotlights (${allUsers.length})</div>
+            <div class="table-responsive">
+              <table class="table align-middle mb-0 small">
+                <thead class="table-light">
+                  <tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Ref Code</th><th>Spotlight</th><th>Role</th><th class="text-end">Actions</th></tr>
+                </thead>
+                <tbody>
+                  ${usersRows}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+      }
+    }
+
+    async function runAdminAction(act, id) {
+      if (!confirm(`Are you sure you want to perform this moderation action on #${id}?`)) return;
+
+      try {
+        const res = await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ act, id })
+        });
+        const data = await res.json();
+        alert(data.message);
+        loadAdminDashboard();
+      } catch (err) {
+        alert('Action error: ' + err.message);
+      }
+    }
+
+    async function addCredits(userId) {
+      const amount = prompt('Enter number of spotlight credits to grant:', '5');
+      if (!amount) return;
+
+      try {
+        const res = await fetch('/api/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ act: 'add_credits', id: userId, credits: parseInt(amount, 10) })
+        });
+        const data = await res.json();
+        alert(data.message);
+        loadAdminDashboard();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    // Theme toggling support
+    (function () {
+      function syncThemeButtons(theme) {
+        document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
+          const icon = btn.querySelector("i");
+          const label = btn.querySelector(".theme-label");
+          if (theme === "dark") {
+            if (icon) icon.className = "bi bi-sun-fill text-warning";
+            if (label) label.textContent = "Light";
+            btn.setAttribute("title", "Switch to Light Theme");
+          } else {
+            if (icon) icon.className = "bi bi-moon-stars-fill";
+            if (label) label.textContent = "Dark";
+            btn.setAttribute("title", "Switch to Dark Theme");
+          }
+        });
+      }
+
+      function applyTheme(theme) {
+        document.documentElement.setAttribute("data-bs-theme", theme);
+        document.documentElement.setAttribute("data-theme", theme);
+        localStorage.setItem("dfq_theme_mode", theme);
+        syncThemeButtons(theme);
+      }
+
+      window.toggleDfqTheme = function () {
+        const current = document.documentElement.getAttribute("data-theme") || "light";
+        applyTheme(current === "dark" ? "light" : "dark");
+      };
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const current = document.documentElement.getAttribute("data-theme") || "light";
+        syncThemeButtons(current);
+        document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
+          btn.addEventListener("click", window.toggleDfqTheme);
+        });
+        checkAuthAndLoadData();
+      });
+    })();
+  </script>
+</body>
+</html>
