@@ -534,7 +534,8 @@ function handleCreateItem(req, res) {
   if (!user) return sendJson(res, false, 'User account not found.', {}, 404);
 
   // Requirement 3: Until user's details, NIN and other verifications has been reviewed by an admin, they can't list
-  if (!user.is_admin && user.kyc_status !== 'approved') {
+  const isApprovedOrUpgrading = user.kyc_status === 'approved' || (user.kyc_tier >= 2 && user.kyc_status === 'pending_review');
+  if (!user.is_admin && !isApprovedOrUpgrading) {
     return sendJson(res, false, 'Identity Verification Required: Your details, NIN and verification documents must be reviewed and approved by an administrator before you can list items.', {
       kyc_required: true,
       kyc_status: user.kyc_status || 'unverified'
@@ -581,8 +582,9 @@ function handleCreateItem(req, res) {
 
   // Handle uploaded images
   let savedPaths = [];
-  if (req.files && req.files.photos && req.files.photos.length > 0) {
-    savedPaths = req.files.photos.map(f => 'uploads/' + f.filename);
+  const photoList = (req.files && (req.files.photos || req.files['photos[]'] || req.files.photo)) || [];
+  if (photoList.length > 0) {
+    savedPaths = photoList.map(f => 'uploads/' + f.filename);
   } else if (body.image_data) {
     // base64 fallback
     const matches = body.image_data.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
@@ -753,7 +755,12 @@ function handleWishlist(req, res) {
 }
 
 // Router for /api/items.php
-app.all('/api/items.php', upload.fields([{ name: 'photos', maxCount: 4 }, { name: 'receipt', maxCount: 1 }]), (req, res) => {
+app.all('/api/items.php', upload.fields([
+  { name: 'photos', maxCount: 10 },
+  { name: 'photos[]', maxCount: 10 },
+  { name: 'photo', maxCount: 10 },
+  { name: 'receipt', maxCount: 1 }
+]), (req, res) => {
   const action = req.query.action || (req.method === 'GET' ? 'list' : '');
   if (req.method === 'GET' && action === 'list') return handleListItems(req, res);
   if (req.method === 'POST' && action === 'create') return handleCreateItem(req, res);
@@ -768,7 +775,12 @@ app.all('/api/items.php', upload.fields([{ name: 'photos', maxCount: 4 }, { name
 
 // RESTful aliases for items
 app.get('/api/items', handleListItems);
-app.post('/api/items', upload.fields([{ name: 'photos', maxCount: 4 }, { name: 'receipt', maxCount: 1 }]), handleCreateItem);
+app.post('/api/items', upload.fields([
+  { name: 'photos', maxCount: 10 },
+  { name: 'photos[]', maxCount: 10 },
+  { name: 'photo', maxCount: 10 },
+  { name: 'receipt', maxCount: 1 }
+]), handleCreateItem);
 app.post('/api/items/boost', handleBoostItem);
 app.post('/api/items/report', handleReportItem);
 app.get('/api/items/check_serial', handleCheckSerial);

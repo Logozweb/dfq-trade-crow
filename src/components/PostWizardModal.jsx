@@ -28,14 +28,6 @@ export default function PostWizardModal({ user, onClose, onSuccess }) {
     setPhotoPreviews(previews);
   };
 
-  const handleCheckSerial = () => {
-    if (!serialImei.trim()) return;
-    fetch(`/api/items.php?action=check_serial&serial=${encodeURIComponent(serialImei.trim())}`)
-      .then(r => r.json())
-      .then(data => setSerialStatus(data))
-      .catch(() => {});
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -55,7 +47,10 @@ export default function PostWizardModal({ user, onClose, onSuccess }) {
       formData.append('pawn_days', pawnDays);
     }
     formData.append('serial_imei', serialImei);
-    photos.forEach(file => formData.append('photos[]', file));
+    photos.forEach(file => {
+      formData.append('photos', file);
+      formData.append('photos[]', file);
+    });
     if (receiptFile) formData.append('receipt', receiptFile);
 
     try {
@@ -63,7 +58,12 @@ export default function PostWizardModal({ user, onClose, onSuccess }) {
         method: 'POST',
         body: formData
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (_) {
+        throw new Error(`Server returned error (${res.status}: ${res.statusText || 'Upload failed'})`);
+      }
       setLoading(false);
       if (data.success) {
         onSuccess && onSuccess(data.message || 'Listing published successfully!');
@@ -73,7 +73,7 @@ export default function PostWizardModal({ user, onClose, onSuccess }) {
       }
     } catch (err) {
       setLoading(false);
-      setError('Connection error while uploading.');
+      setError(err.message || 'Connection error while uploading.');
     }
   };
 
@@ -321,30 +321,17 @@ export default function PostWizardModal({ user, onClose, onSuccess }) {
                 <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--dfq-text)' }}>
                   Device Serial / IMEI / VIN (Anti-Theft Check)
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={serialImei}
-                    onChange={e => setSerialImei(e.target.value)}
-                    placeholder="Enter serial or 15-digit IMEI..."
-                    className="flex-1 px-3 py-2 text-xs border rounded-lg outline-none font-mono"
-                    style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border-strong)', color: 'var(--dfq-text)' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleCheckSerial}
-                    className="px-3 py-2 text-xs font-semibold rounded-lg border text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                    style={{ borderColor: 'var(--dfq-border)' }}
-                  >
-                    Check
-                  </button>
-                </div>
-                {serialStatus && (
-                  <div className="mt-1 text-[11px] font-semibold flex items-center gap-1 text-emerald-600">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Serial clean on records.</span>
-                  </div>
-                )}
+                <input
+                  type="text"
+                  value={serialImei}
+                  onChange={e => setSerialImei(e.target.value)}
+                  placeholder="Enter device serial or 15-digit IMEI (Optional)..."
+                  className="w-full px-3 py-2 text-xs border rounded-lg outline-none font-mono"
+                  style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border-strong)', color: 'var(--dfq-text)' }}
+                />
+                <span className="text-[11px] text-slate-500 mt-1 block">
+                  Serial numbers are screened automatically against DFQ anti-theft and pawn registers.
+                </span>
               </div>
 
               <div>
