@@ -1,41 +1,107 @@
-import React from 'react';
-import { X, MapPin, Star, BadgeCheck, MessageSquare, ArrowLeftRight, ShieldCheck, QrCode } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, MapPin, Star, BadgeCheck, MessageSquare, ArrowLeftRight, ShieldCheck, QrCode, ChevronLeft, ChevronRight, Images } from 'lucide-react';
 
 export default function ItemDetailModal({ item, onClose, onOpenChat, onOpenSwap }) {
   if (!item) return null;
 
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const gallery = (item.gallery && Array.isArray(item.gallery) && item.gallery.length > 0)
+    ? item.gallery
+    : [item.image_path || 'assets/img/phone.svg'];
+
+  const currentImage = gallery[activeImageIndex] || item.image_path;
   const isReceipt = Boolean(item.receipt_path);
   const formatNaira = (val) => '₦' + Number(val || 0).toLocaleString('en-NG');
 
+  const handlePrevImage = (e) => {
+    e.stopPropagation();
+    setActiveImageIndex(prev => (prev === 0 ? gallery.length - 1 : prev - 1));
+  };
+
+  const handleNextImage = (e) => {
+    e.stopPropagation();
+    setActiveImageIndex(prev => (prev === gallery.length - 1 ? 0 : prev + 1));
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
       <div
-        className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]"
-        style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border)' }}
+        className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[92vh] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
       >
-        {/* Left: Image Area */}
-        <div className="md:w-1/2 bg-slate-100 dark:bg-slate-800 relative h-64 md:h-auto min-h-[260px]">
-          <img
-            src={item.image_path}
-            alt={item.title}
-            className="w-full h-full object-cover"
-            onError={e => { e.target.src = 'assets/img/couch.svg'; }}
-          />
-          <span
-            className="absolute top-3 left-3 text-[11px] font-bold px-2.5 py-1 rounded shadow-sm border uppercase"
-            style={{
-              backgroundColor: item.mode === 'Barter Only' ? 'var(--dfq-primary-light)' : item.mode === 'Cash or Swap' ? 'var(--dfq-purple-bg)' : 'var(--dfq-amber-bg)',
-              borderColor: item.mode === 'Barter Only' ? 'var(--dfq-primary-border)' : item.mode === 'Cash or Swap' ? 'var(--dfq-purple-border)' : 'var(--dfq-amber-border)',
-              color: item.mode === 'Barter Only' ? 'var(--dfq-primary)' : item.mode === 'Cash or Swap' ? 'var(--dfq-purple)' : 'var(--dfq-amber)'
-            }}
-          >
-            {item.mode}
-          </span>
-          {isReceipt && (
-            <span className="absolute bottom-3 left-3 text-xs font-semibold px-2 py-0.5 rounded bg-emerald-600 text-white flex items-center gap-1 shadow-sm">
-              <BadgeCheck className="w-3.5 h-3.5" />
-              Receipt Verified
+        {/* Left: Image Gallery Area */}
+        <div className="md:w-1/2 bg-slate-100 dark:bg-slate-800/80 flex flex-col justify-between p-3 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800">
+          <div className="relative rounded-xl overflow-hidden aspect-square sm:aspect-4/3 w-full bg-slate-200 dark:bg-slate-800">
+            <img
+              src={currentImage}
+              alt={item.title}
+              className="w-full h-full object-cover"
+              onError={e => { e.target.src = 'assets/img/phone.svg'; }}
+            />
+
+            {/* Mode Badge */}
+            <span
+              className="absolute top-3 left-3 text-[11px] font-bold px-2.5 py-1 rounded shadow-sm border uppercase bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-700"
+            >
+              {item.mode}
             </span>
+
+            {/* Receipt Verified Badge */}
+            {isReceipt && (
+              <span className="absolute bottom-3 left-3 text-xs font-semibold px-2 py-0.5 rounded bg-emerald-600 text-white flex items-center gap-1 shadow-sm">
+                <BadgeCheck className="w-3.5 h-3.5" />
+                Receipt Verified
+              </span>
+            )}
+
+            {/* Prev / Next Controls if multiple photos */}
+            {gallery.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={handlePrevImage}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/75 text-white flex items-center justify-center border-0 cursor-pointer backdrop-blur-xs transition-all"
+                  title="Previous photo"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextImage}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/75 text-white flex items-center justify-center border-0 cursor-pointer backdrop-blur-xs transition-all"
+                  title="Next photo"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <span className="absolute top-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/60 text-white backdrop-blur-xs">
+                  {activeImageIndex + 1} / {gallery.length}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Thumbnail Strip */}
+          {gallery.length > 1 && (
+            <div className="flex items-center gap-2 mt-3 overflow-x-auto pb-1">
+              {gallery.map((imgUrl, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setActiveImageIndex(idx)}
+                  className={`relative w-14 h-14 rounded-lg overflow-hidden shrink-0 border-2 cursor-pointer transition-all p-0 bg-slate-200 dark:bg-slate-800 ${
+                    activeImageIndex === idx
+                      ? 'border-sky-500 shadow-sm scale-105'
+                      : 'border-transparent opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <img
+                    src={imgUrl}
+                    alt={`thumbnail ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={e => { e.target.src = 'assets/img/phone.svg'; }}
+                  />
+                </button>
+              ))}
+            </div>
           )}
         </div>
 

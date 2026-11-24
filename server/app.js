@@ -696,9 +696,52 @@ function handleToggleStatus(req, res) {
     return sendJson(res, false, 'Item not found or unauthorized.', {}, 403);
   }
 
-  const newStatus = item.status === 'Active' ? 'Swapped' : 'Active';
+  let newStatus = req.body.status;
+  if (!newStatus) {
+    newStatus = item.status === 'Active' ? 'Hidden' : 'Active';
+  }
+
+  const allowed = ['Active', 'Hidden', 'Swapped'];
+  if (!allowed.includes(newStatus)) {
+    return sendJson(res, false, 'Invalid status specified.', {}, 400);
+  }
+
   db.prepare('UPDATE items SET status = ? WHERE id = ?').run(newStatus, itemId);
-  return sendJson(res, true, `Listing marked as ${newStatus}.`, { status: newStatus });
+  return sendJson(res, true, `Listing visibility updated to ${newStatus}.`, { status: newStatus });
+}
+
+function handleEditItem(req, res) {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const itemId = parseInt(req.body.item_id || req.params.id || '0', 10);
+  const item = db.prepare('SELECT id, user_id, status FROM items WHERE id = ?').get(itemId);
+  if (!item) return sendJson(res, false, 'Item not found.', {}, 404);
+  if (Number(item.user_id) !== userId) {
+    return sendJson(res, false, 'Forbidden: You can only edit your own listings.', {}, 403);
+  }
+
+  const body = req.body || {};
+  const title = (body.title || '').trim();
+  const category = (body.category || '').trim();
+  const mode = (body.mode || '').trim();
+  const condition = (body.item_condition || 'Neatly Used').trim();
+  const location = (body.location || '').trim();
+  const wanted = (body.wanted || '').trim();
+  const estValue = parseFloat(String(body.est_value || '0').replace(/[^0-9.]/g, '')) || 0;
+  const desc = (body.description || '').trim();
+
+  if (!title || !category || !location || !wanted) {
+    return sendJson(res, false, 'Title, Category, Location, and Wanted item are required.', {}, 400);
+  }
+
+  db.prepare(`
+    UPDATE items
+    SET title = ?, category = ?, mode = ?, item_condition = ?, location = ?, wanted = ?, est_value = ?, description = ?
+    WHERE id = ?
+  `).run(title, category, mode, condition, location, wanted, estValue, desc, itemId);
+
+  return sendJson(res, true, 'Listing updated successfully!');
 }
 
 function handleDeleteItem(req, res) {
@@ -767,6 +810,7 @@ app.all('/api/items.php', upload.fields([
   if (req.method === 'POST' && action === 'boost') return handleBoostItem(req, res);
   if (req.method === 'POST' && action === 'report') return handleReportItem(req, res);
   if (req.method === 'GET' && action === 'check_serial') return handleCheckSerial(req, res);
+  if (req.method === 'POST' && action === 'edit') return handleEditItem(req, res);
   if (req.method === 'POST' && action === 'toggle_status') return handleToggleStatus(req, res);
   if (req.method === 'POST' && action === 'delete') return handleDeleteItem(req, res);
   if (action === 'wishlist') return handleWishlist(req, res);
@@ -781,6 +825,11 @@ app.post('/api/items', upload.fields([
   { name: 'photo', maxCount: 10 },
   { name: 'receipt', maxCount: 1 }
 ]), handleCreateItem);
+app.post('/api/items/edit', handleEditItem);
+app.post('/api/items/:id/edit', handleEditItem);
+app.post('/api/items/toggle_status', handleToggleStatus);
+app.post('/api/items/delete', handleDeleteItem);
+app.delete('/api/items/:id', handleDeleteItem);
 app.post('/api/items/boost', handleBoostItem);
 app.post('/api/items/report', handleReportItem);
 app.get('/api/items/check_serial', handleCheckSerial);
@@ -1561,7 +1610,17 @@ function handleGetThread(req, res) {
 
   let otherUserId = parseInt(req.query.other_user_id || '0', 10);
   if (!otherUserId) {
-    otherUserId = (currentUserId === Number(item.user_id)) ? 0 : Number(item.user_id);
+    if (currentUserId === Number(item.user_id)) {
+      // Find the most recent person who sent a message about this item
+      const latestMsg = db.prepare(`
+        SELECT CASE WHEN sender_id = ? THEN recipient_id ELSE sender_id END AS partner_id
+        FROM messages WHERE item_id = ? AND (sender_id = ? OR recipient_id = ?)
+        ORDER BY id DESC LIMIT 1
+      `).get(currentUserId, itemId, currentUserId, currentUserId);
+      otherUserId = latestMsg ? Number(latestMsg.partner_id) : 0;
+    } else {
+      otherUserId = Number(item.user_id);
+    }
   }
 
   // Fetch all messages for this item between current user and other user

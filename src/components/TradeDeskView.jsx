@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Kanban, ArrowLeftRight, Clock, CheckCircle2, XCircle, ShieldCheck, Tag,
-  Wallet, Eye, AlertCircle, Package, Send, Check, X, QrCode
+  Wallet, Eye, EyeOff, AlertCircle, Package, Send, Check, X, QrCode, Edit3, Trash2
 } from 'lucide-react';
+import UserEditListingModal from './UserEditListingModal';
 
 export default function TradeDeskView({ user, onOpenChat }) {
   const [activeTab, setActiveTab] = useState('my_listings'); // 'my_listings', 'incoming', 'outgoing', 'pawn'
@@ -13,6 +14,7 @@ export default function TradeDeskView({ user, onOpenChat }) {
   const [handoverOffer, setHandoverOffer] = useState(null);
   const [otpInput, setOtpInput] = useState('');
   const [toastMsg, setToastMsg] = useState('');
+  const [editingItem, setEditingItem] = useState(null);
 
   const loadData = () => {
     setLoading(true);
@@ -63,6 +65,38 @@ export default function TradeDeskView({ user, onOpenChat }) {
         loadData();
       } else {
         alert(data.message || 'Invalid code.');
+      }
+    } catch {}
+  };
+
+  const handleToggleHideItem = async (item) => {
+    const newStatus = item.status === 'Active' ? 'Hidden' : 'Active';
+    try {
+      const res = await fetch('/api/items/toggle_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: item.id, status: newStatus })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMsg(`Listing ${newStatus === 'Hidden' ? 'hidden from marketplace' : 'made active live'}!`);
+        loadData();
+      }
+    } catch {}
+  };
+
+  const handleDeleteItem = async (item) => {
+    if (!window.confirm(`Are you sure you want to permanently delete "${item.title}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch('/api/items/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: item.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMsg('Listing deleted permanently.');
+        loadData();
       }
     } catch {}
   };
@@ -193,17 +227,24 @@ export default function TradeDeskView({ user, onOpenChat }) {
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                           : item.status === 'pending_review'
                           ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                          : item.status === 'Hidden'
+                          ? 'bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
                           : item.status === 'Swapped'
                           ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
                           : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
                       }`}>
-                        {item.status === 'pending_review' ? 'Pending Admin Review' : item.status === 'Active' ? 'Live on Marketplace' : item.status}
+                        {item.status === 'pending_review' ? 'Pending Admin Review' : item.status === 'Active' ? 'Live on Marketplace' : item.status === 'Hidden' ? 'Hidden by You' : item.status}
                       </span>
                       <span className="text-[11px] text-slate-400 font-mono">#{item.id}</span>
                     </div>
 
-                    <div className="aspect-video w-full rounded-xl bg-slate-100 dark:bg-slate-800 overflow-hidden mb-3">
+                    <div className="aspect-video w-full rounded-xl bg-slate-100 dark:bg-slate-800 overflow-hidden mb-3 relative group">
                       <img src={item.image_path} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = 'assets/img/phone.svg'; }} />
+                      {item.gallery && item.gallery.length > 1 && (
+                        <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/60 text-white text-[10px] font-medium backdrop-blur-xs">
+                          {item.gallery.length} photos
+                        </span>
+                      )}
                     </div>
 
                     <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-1">{item.title}</h4>
@@ -216,14 +257,57 @@ export default function TradeDeskView({ user, onOpenChat }) {
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                    <span>{new Date(item.created_at).toLocaleDateString()}</span>
-                    {item.status === 'pending_review' && (
-                      <span className="text-[11px] text-amber-600 font-semibold flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        Awaiting compliance check
-                      </span>
-                    )}
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                      {item.status === 'pending_review' && (
+                        <span className="text-[11px] text-amber-600 font-semibold flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          Awaiting compliance
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Listing Management Controls (Edit, Hide/Unhide, Delete) */}
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setEditingItem(item)}
+                        className="flex-1 py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs border-0 cursor-pointer transition-colors flex items-center justify-center gap-1"
+                        title="Edit listing details"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-sky-500" />
+                        <span>Edit</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleToggleHideItem(item)}
+                        className="flex-1 py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs border-0 cursor-pointer transition-colors flex items-center justify-center gap-1"
+                        title={item.status === 'Active' ? 'Hide listing from public search' : 'Restore listing to public marketplace'}
+                      >
+                        {item.status === 'Active' ? (
+                          <>
+                            <EyeOff className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Hide</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Unhide</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteItem(item)}
+                        className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 border-0 cursor-pointer transition-colors"
+                        title="Delete listing permanently"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -413,6 +497,17 @@ export default function TradeDeskView({ user, onOpenChat }) {
             </div>
           </div>
         </div>
+      )}
+      {/* User Edit Listing Modal */}
+      {editingItem && (
+        <UserEditListingModal
+          item={editingItem}
+          onClose={() => setEditingItem(null)}
+          onUpdated={() => {
+            setToastMsg('Listing updated successfully!');
+            loadData();
+          }}
+        />
       )}
     </div>
   );

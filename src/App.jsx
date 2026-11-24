@@ -31,7 +31,8 @@ import {
   Bell,
   LayoutGrid,
   ShieldAlert,
-  Menu
+  Menu,
+  Images
 } from 'lucide-react';
 
 import ItemDetailModal from './components/ItemDetailModal';
@@ -398,13 +399,13 @@ export default function App() {
             <button
               onClick={() => {
                 if (user) {
-                  openChatFor({ id: 101, title: 'Inquiries Desk', image_path: 'assets/img/phone.svg', owner_name: 'DFQ Trader Hub', user_id: 1, mode: 'Direct Barter' });
+                  setActiveChat({ openList: true });
                 } else {
                   setShowAuthModal('login');
                 }
               }}
               className="relative p-1.5 sm:p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border-0 bg-transparent cursor-pointer transition-colors shrink-0"
-              title="Real-time Chat"
+              title="Real-time Chat & Inquiries"
             >
               <MessageSquare className="w-4 h-4 shrink-0" />
               {unreadMessagesCount > 0 && (
@@ -786,6 +787,14 @@ export default function App() {
                           {item.mode}
                         </span>
 
+                        {/* Multi-photo badge */}
+                        {item.gallery && item.gallery.length > 1 && (
+                          <span className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/60 text-white text-[10px] font-medium backdrop-blur-xs flex items-center gap-1 shadow-sm">
+                            <Images className="w-3 h-3" />
+                            <span>{item.gallery.length}</span>
+                          </span>
+                        )}
+
                         {/* Favorite Button */}
                         <button
                           onClick={e => {
@@ -921,6 +930,7 @@ export default function App() {
           currentUser={user}
           onClose={() => setActiveChat(null)}
           onOpenAuth={() => setShowAuthModal('login')}
+          onMessagesRead={() => loadUnreadMessages()}
         />
       )}
 
@@ -940,9 +950,27 @@ export default function App() {
           }}
           onNavigate={(link) => {
             setShowNotificationCenter(false);
-            if (link?.includes('admin')) setActiveView('admin');
-            else if (link?.includes('chat')) {
-              // Open chat
+            if (link?.includes('admin')) {
+              setActiveView('admin');
+            } else if (link?.includes('chat')) {
+              try {
+                const url = new URL(link, window.location.origin);
+                const itemId = parseInt(url.searchParams.get('item_id') || '0', 10);
+                const partnerId = parseInt(url.searchParams.get('partner_id') || '0', 10);
+                if (itemId) {
+                  const targetItem = items.find(it => it.id === itemId) || { id: itemId };
+                  setActiveChat({
+                    item: targetItem,
+                    otherUser: partnerId ? { id: partnerId } : null
+                  });
+                } else {
+                  setActiveChat({ openList: true });
+                }
+              } catch (_) {
+                setActiveChat({ openList: true });
+              }
+            } else if (link?.includes('kyc')) {
+              setShowKycModal(true);
             }
           }}
         />
