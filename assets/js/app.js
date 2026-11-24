@@ -879,11 +879,58 @@ function getBadgeClass(mode) {
   return "badge-pawn";
 }
 
-// Auto-fill referral code if ?ref= is in URL
+// Auto-fill and recognize referral invitation banner if ?ref= is in URL
 const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get("ref")) {
-  document.getElementById("regRefCode").value = urlParams.get("ref");
+const initialRefCode = urlParams.get("ref");
+if (initialRefCode) {
+  const regRefInput = document.getElementById("regRefCode");
+  if (regRefInput) regRefInput.value = initialRefCode;
+  fetch(`/api/auth/referral-info?code=${encodeURIComponent(initialRefCode)}`)
+    .then((r) => r.json())
+    .then((res) => {
+      const banner = document.getElementById("referralInviteBanner");
+      const inviterText = document.getElementById("referralInviterText");
+      if (res.success && res.data && banner && inviterText) {
+        inviterText.textContent = `You were invited by ${res.data.inviter_name}! 1 Free Spotlight Credit unlocked upon sign-up.`;
+        banner.classList.remove("d-none");
+      }
+    })
+    .catch(() => {});
 }
+
+// First-Action Onboarding Selector
+window.selectFirstAction = function (choice) {
+  const modalEl = document.getElementById("firstActionModal");
+  if (modalEl) {
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+  }
+  localStorage.setItem("dfq_first_action_done", "true");
+
+  if (choice === "swap") {
+    const btn = document.querySelector('.mode-pill[data-mode="Barter Only"]') || document.querySelector('.mode-pill[data-mode="all"]');
+    if (btn) btn.click();
+    const market = document.getElementById("marketplace");
+    if (market) market.scrollIntoView({ behavior: "smooth" });
+    showToast("Showing items available for direct Swap!");
+  } else if (choice === "pawn") {
+    const btn = document.querySelector('.mode-pill[data-mode="Pawn / Quick Sale"]');
+    if (btn) btn.click();
+    const market = document.getElementById("marketplace");
+    if (market) market.scrollIntoView({ behavior: "smooth" });
+    showToast("Showing collateral and pawn quick-cash items!");
+  } else if (choice === "browse") {
+    const searchInput = document.getElementById("searchInput");
+    if (searchInput) searchInput.focus();
+    const market = document.getElementById("marketplace");
+    if (market) market.scrollIntoView({ behavior: "smooth" });
+  }
+};
+
+window.openFirstActionModal = function () {
+  const fam = document.getElementById("firstActionModal");
+  if (fam) new bootstrap.Modal(fam).show();
+};
 
 document.getElementById("postModeSelect").addEventListener("change", (e) => {
   document.getElementById("pawnFieldsBox").classList.toggle("d-none", e.target.value !== "Pawn / Quick Sale");
@@ -918,12 +965,22 @@ function updateAuthUI() {
     guestBtns.classList.add("d-none");
     userBadge.classList.remove("d-none");
     userBadge.classList.add("d-flex");
-    const isKyc = Boolean(currentUser.kyc_verified);
-    const kycChip = isKyc ? ` <span class="badge bg-success text-white ms-1"><i class="bi bi-patch-check-fill"></i> KYC</span>` : "";
-    const firstName = String(currentUser.full_name || "Trader").split(" ")[0]; document.getElementById("navUserName").innerHTML = `<i class="bi bi-person-check-fill"></i> <span class="d-none d-md-inline">${firstName}</span>${kycChip}`;
+    const tier = Number(currentUser.kyc_tier || (currentUser.kyc_verified ? 2 : 1));
+    let kycChip = "";
+    if (tier === 3) {
+      kycChip = ` <span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1" title="Tier 3 Pro Storefront / Pawn Merchant"><i class="bi bi-award-fill"></i> Gold Seal</span>`;
+    } else if (tier === 2) {
+      kycChip = ` <span class="badge bg-primary-subtle text-primary border border-primary ms-1" title="Tier 2 Verified Trader"><i class="bi bi-shield-fill-check"></i> Blue Shield</span>`;
+    }
+    const firstName = String(currentUser.full_name || "Trader").split(" ")[0];
+    document.getElementById("navUserName").innerHTML = `<i class="bi bi-person-check-fill"></i> <span class="d-none d-md-inline">${firstName}</span>${kycChip}`;
     adminLink.classList.toggle("d-none", Number(currentUser.is_admin) !== 1);
     const kycNavText = document.getElementById("kycNavText");
-    if (kycNavText) kycNavText.textContent = isKyc ? "KYC Verified" : "Verify KYC / OTP";
+    if (kycNavText) {
+      if (tier === 3) kycNavText.textContent = "Tier 3: Gold Seal Active";
+      else if (tier === 2) kycNavText.textContent = "Tier 2: Blue Shield Active";
+      else kycNavText.textContent = "Verify KYC / OTP";
+    }
   } else {
     guestBtns.classList.remove("d-none");
     userBadge.classList.add("d-none");
@@ -1051,6 +1108,11 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
         const pendingId = window.__pendingSwapItemId;
         window.__pendingSwapItemId = null;
         openSwapModal(pendingId);
+      } else {
+        setTimeout(() => {
+          const fam = document.getElementById("firstActionModal");
+          if (fam) new bootstrap.Modal(fam).show();
+        }, 350);
       }
       submitBtn.disabled = false;
       submitBtn.textContent = origText;
@@ -1097,6 +1159,11 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
     const pendingId = window.__pendingSwapItemId;
     window.__pendingSwapItemId = null;
     openSwapModal(pendingId);
+  } else {
+    setTimeout(() => {
+      const fam = document.getElementById("firstActionModal");
+      if (fam) new bootstrap.Modal(fam).show();
+    }, 350);
   }
 
   submitBtn.disabled = false;
@@ -1206,12 +1273,13 @@ function renderListings() {
     const isFeatured = Number(item.is_featured) === 1;
     const hasReceipt = Boolean(item.receipt_path);
     const isFav = favIds.includes(Number(item.id));
-    const isOwnerKyc = item.owner_kyc_verified !== false;
-    const escrowTag = item.status === "In Escrow" ? `<span class="badge badge-escrow ms-1">Inspection Hold</span>` : "";
-    const spotlightTag = isFeatured ? `<span class="badge bg-sky-primary ms-1"><i class="bi bi-lightning-fill"></i> Spotlight</span>` : "";
-    const kycBadgeHtml = isOwnerKyc
-      ? `<span class="badge-kyc-verified ms-1" title="NIN / BVN / Phone OTP Verified Trader"><i class="bi bi-shield-fill-check"></i> KYC Verified</span>`
-      : "";
+    const ownerTier = Number(item.owner_kyc_tier || (item.owner_kyc_verified !== false ? 2 : 1));
+    let kycBadgeHtml = "";
+    if (ownerTier === 3) {
+      kycBadgeHtml = `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1" title="Tier 3 Pro Storefront / Pawn Merchant"><i class="bi bi-award-fill"></i> Gold Seal Pro</span>`;
+    } else if (ownerTier === 2) {
+      kycBadgeHtml = `<span class="badge bg-primary-subtle text-primary border border-primary ms-1" title="Tier 2 Verified Trader"><i class="bi bi-shield-fill-check"></i> Blue Shield</span>`;
+    }
 
     const col = document.createElement("div");
     col.className = "col-md-6 col-lg-4";
@@ -1245,7 +1313,10 @@ function renderListings() {
               <span class="d-block text-muted" style="font-size: 0.72rem;">Est. Value</span>
               <span class="fw-bold text-dark">${formatNaira(item.est_value)}</span>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-1.5 align-items-center">
+              <button type="button" class="btn btn-light border btn-sm px-2 text-sky" onclick="openInquiryDrawer(${item.id})" title="Chat / Inquire with Trader" aria-label="Chat with Trader">
+                <i class="bi bi-chat-dots-fill"></i>
+              </button>
               <button type="button" class="btn btn-outline-sky btn-sm px-2.5" onclick="openDetails(${item.id})">Details</button>
               <button type="button" class="btn btn-sky btn-sm px-3" onclick="openSwapModal(${item.id})">Propose Swap</button>
             </div>
@@ -1450,6 +1521,14 @@ window.openDetails = function (id) {
     openSwapModal(item.id);
   };
 
+  const detailInquireBtn = document.getElementById("detailInquireBtn");
+  if (detailInquireBtn) {
+    detailInquireBtn.onclick = function () {
+      bootstrap.Modal.getInstance(document.getElementById("itemDetailModal"))?.hide();
+      openInquiryDrawer(item.id);
+    };
+  }
+
   document.getElementById("detailShareBtn").onclick = function () {
     const shareText = `SWAP ALERT on DFQ Trade Crow: ${item.title} (${item.location}) -> Looking for: ${item.wanted}. Check it out: ${window.location.href}`;
     navigator.clipboard?.writeText(shareText);
@@ -1525,12 +1604,28 @@ document.getElementById("btnSearchNow").addEventListener("click", () => {
 })();
 
 
-// === NIN / BVN / PHONE OTP TRADER VERIFICATION HANDLERS ===
+// === TIERED TRUST & IDENTITY VERIFICATION (KYC) CONTROLLER ===
 let generatedDemoOtp = "";
+
+window.toggleKycTierFields = function () {
+  const isTier3 = document.getElementById("tierChoice3")?.checked;
+  const t2Wrap = document.getElementById("kycTier2Fields");
+  const t3Wrap = document.getElementById("kycTier3Fields");
+  const btn = document.getElementById("btnSubmitKycTier");
+  if (t2Wrap && t3Wrap) {
+    t2Wrap.classList.toggle("d-none", Boolean(isTier3));
+    t3Wrap.classList.toggle("d-none", !isTier3);
+  }
+  if (btn) {
+    btn.innerHTML = isTier3
+      ? `<i class="bi bi-award-fill me-1"></i> Activate Tier 3 Pro Merchant Badge`
+      : `<i class="bi bi-patch-check-fill me-1"></i> Verify & Unlock Blue Shield Badge`;
+  }
+};
 
 window.openKycModal = function () {
   if (!currentUser) {
-    openAuthModal("register");
+    openAuthModal("login");
     showToast("Create or log into your account first to verify your KYC / OTP badge.");
     return;
   }
@@ -1540,14 +1635,25 @@ window.openKycModal = function () {
   }
   const verifiedBox = document.getElementById("kycAlreadyVerifiedBox");
   const summaryEl = document.getElementById("kycVerifiedSummary");
-  if (currentUser.kyc_verified) {
-    verifiedBox.classList.remove("d-none");
+  const titleBadge = document.getElementById("kycTierTitleBadge");
+  const tier = Number(currentUser.kyc_tier || (currentUser.kyc_verified ? 2 : 1));
+
+  if (tier >= 2) {
+    if (verifiedBox) verifiedBox.classList.remove("d-none");
+    if (titleBadge) {
+      titleBadge.textContent = tier === 3
+        ? "Tier 3: Gold Seal Pro Merchant Active!"
+        : "Tier 2: Blue Shield Verified Trader Active!";
+    }
     if (summaryEl) {
-      summaryEl.textContent = `Verified via ${currentUser.kyc_method || "Phone OTP & NIN"} (${currentUser.kyc_masked_id || "OTP Confirmed"}).`;
+      summaryEl.textContent = tier === 3
+        ? `Registered Store: ${currentUser.business_name || "Verified Storefront"}. High-volume collateral & zero escrow wait enabled.`
+        : `Verified via ${currentUser.kyc_method || "Phone OTP & NIN"} (${currentUser.kyc_masked_id || "ID Confirmed"}). Trade limits unlocked.`;
     }
   } else {
-    verifiedBox.classList.add("d-none");
+    if (verifiedBox) verifiedBox.classList.add("d-none");
   }
+  window.toggleKycTierFields();
   new bootstrap.Modal(document.getElementById("kycVerifyModal")).show();
 };
 
@@ -1579,46 +1685,105 @@ if (btnSendKycOtp) {
 
 const kycVerifyForm = document.getElementById("kycVerifyForm");
 if (kycVerifyForm) {
-  kycVerifyForm.addEventListener("submit", (e) => {
+  kycVerifyForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!currentUser) return;
-    const method = document.getElementById("kycMethodSelect").value;
-    const idNum = document.getElementById("kycIdNumberInput").value.trim();
-    const otpVal = document.getElementById("kycOtpCodeInput").value.trim();
 
-    if (method !== "Phone SMS OTP Only" && !/^\d{11}$/.test(idNum)) {
-      alert("Please enter a valid 11-digit NIN or BVN number.");
-      return;
-    }
-    if (!/^\d{6}$/.test(otpVal)) {
-      alert("Please enter the 6-digit OTP code.");
-      return;
-    }
-    if (generatedDemoOtp && otpVal !== generatedDemoOtp) {
-      alert("Invalid OTP code. Click 'Send OTP' and enter the 6-digit code.");
-      return;
+    const isTier3 = document.getElementById("tierChoice3")?.checked;
+    const tierNum = isTier3 ? 3 : 2;
+
+    let payload = { tier: tierNum };
+
+    if (tierNum === 2) {
+      const method = document.getElementById("kycMethodSelect").value;
+      const idNum = document.getElementById("kycIdNumberInput").value.trim();
+      const otpVal = document.getElementById("kycOtpCodeInput").value.trim();
+
+      if (method !== "Phone SMS OTP Only" && !/^\d{11}$/.test(idNum)) {
+        alert("Please enter a valid 11-digit NIN or BVN number.");
+        return;
+      }
+      if (!/^\d{6}$/.test(otpVal)) {
+        alert("Please enter the 6-digit OTP code.");
+        return;
+      }
+      if (generatedDemoOtp && otpVal !== generatedDemoOtp) {
+        alert("Invalid OTP code. Click 'Send OTP' and enter the 6-digit code.");
+        return;
+      }
+      payload.nin_bvn = idNum || "NIN-VERIFIED";
+    } else {
+      const bName = document.getElementById("kycBusinessName")?.value.trim();
+      const bAddr = document.getElementById("kycBusinessAddress")?.value.trim();
+      if (!bName) {
+        alert("Please enter your Merchant / Business Store Name.");
+        return;
+      }
+      payload.business_name = bName;
+      payload.business_address = bAddr;
     }
 
-    const masked = idNum ? `${idNum.slice(0, 3)}*****${idNum.slice(-3)}` : "Phone Verified";
-    currentUser.kyc_verified = true;
-    currentUser.kyc_method = method;
-    currentUser.kyc_masked_id = masked;
-    writeLocalStore(LOCAL_KEYS.session, currentUser);
-
-    const users = readLocalStore(LOCAL_KEYS.users, []);
-    const uIdx = users.findIndex((u) => u.email === currentUser.email);
-    if (uIdx !== -1) {
-      users[uIdx].kyc_verified = true;
-      users[uIdx].kyc_method = method;
-      users[uIdx].kyc_masked_id = masked;
-      writeLocalStore(LOCAL_KEYS.users, users);
+    try {
+      const res = await fetch("/api/kyc/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        currentUser.kyc_tier = data.data.kyc_tier;
+        currentUser.kyc_verified = true;
+        if (payload.business_name) currentUser.business_name = payload.business_name;
+        writeLocalStore(LOCAL_KEYS.session, currentUser);
+        updateAuthUI();
+        loadLiveItems();
+        bootstrap.Modal.getInstance(document.getElementById("kycVerifyModal"))?.hide();
+        triggerConfettiBurst(document.getElementById("btnOpenKycModal") || document.body);
+        showToast(data.message || "KYC Verified Trader Badge activated!");
+        return;
+      } else {
+        alert(data.message || "Verification failed.");
+        return;
+      }
+    } catch (_) {
+      // Local fallback
+      currentUser.kyc_tier = tierNum;
+      currentUser.kyc_verified = true;
+      writeLocalStore(LOCAL_KEYS.session, currentUser);
+      updateAuthUI();
+      loadLiveItems();
+      bootstrap.Modal.getInstance(document.getElementById("kycVerifyModal"))?.hide();
+      triggerConfettiBurst(document.getElementById("btnOpenKycModal") || document.body);
+      showToast(tierNum === 3 ? "Tier 3 Pro Merchant Badge activated!" : "Tier 2 Blue Shield Badge activated!");
     }
+  });
+}
 
-    updateAuthUI();
-    loadLiveItems();
-    bootstrap.Modal.getInstance(document.getElementById("kycVerifyModal")).hide();
-    triggerConfettiBurst(document.getElementById("btnOpenKycModal"));
-    showToast("KYC Verified Trader Badge activated!");
+// Listing Photos Thumbnail Previewer
+const postPhotosInput = document.getElementById("postPhotosInput");
+if (postPhotosInput) {
+  postPhotosInput.addEventListener("change", (e) => {
+    const container = document.getElementById("photosPreviewContainer");
+    if (!container) return;
+    container.innerHTML = "";
+    const files = Array.from(e.target.files || []).slice(0, 4);
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const thumb = document.createElement("div");
+        thumb.className = "position-relative border rounded-3 overflow-hidden shadow-sm";
+        thumb.style.width = "72px";
+        thumb.style.height = "72px";
+        thumb.innerHTML = `
+          <img src="${evt.target.result}" style="width:100%;height:100%;object-fit:cover;" alt="preview" />
+          <span class="position-absolute bottom-0 start-0 end-0 bg-dark bg-opacity-75 text-white small px-1 py-0.5 text-truncate text-center" style="font-size:0.65rem;">
+            ${file.name}
+          </span>
+        `;
+        container.appendChild(thumb);
+      };
+      reader.readAsDataURL(file);
+    });
   });
 }
 
@@ -1645,3 +1810,398 @@ document.querySelectorAll('[data-bs-toggle="tooltip"], .nav-icon-btn[title]').fo
     new bootstrap.Tooltip(el);
   }
 });
+
+
+// =========================================================
+// IN-APP CHAT & DIRECT INQUIRIES DRAWER
+// =========================================================
+
+let currentChat = {
+  itemId: null,
+  partnerId: null,
+  pollTimer: null
+};
+
+window.openInquiryDrawer = async function (itemId) {
+  const item = liveItems.find((i) => Number(i.id) === Number(itemId));
+  if (!item) return;
+
+  // Check login
+  if (!currentUser) {
+    showToast("Please log in to chat with the owner.");
+    openAuthModal("login");
+    return;
+  }
+
+  // Prevent chatting with yourself
+  if (currentUser.id === Number(item.user_id)) {
+    showToast("This is your own listing! Check your Trade Desk for incoming offers.");
+    return;
+  }
+
+  currentChat.itemId = Number(itemId);
+  currentChat.partnerId = Number(item.user_id);
+
+  // Set header info
+  const chatItemImg = document.getElementById("chatItemImg");
+  const chatItemTitle = document.getElementById("chatItemTitle");
+  const chatPartnerInfo = document.getElementById("chatPartnerInfo");
+
+  if (chatItemImg) chatItemImg.src = item.image_path || "assets/img/phone.svg";
+  if (chatItemTitle) chatItemTitle.textContent = item.title;
+  if (chatPartnerInfo) chatPartnerInfo.textContent = `Chatting with ${item.owner_name} • ${item.mode}`;
+
+  const drawerEl = document.getElementById("chatDrawer");
+  if (drawerEl && window.bootstrap && bootstrap.Offcanvas) {
+    const offcanvas = bootstrap.Offcanvas.getOrCreateInstance(drawerEl);
+    offcanvas.show();
+  }
+
+  await loadChatThread();
+
+  // Start polling while drawer is open
+  if (currentChat.pollTimer) clearInterval(currentChat.pollTimer);
+  currentChat.pollTimer = setInterval(loadChatThread, 4000);
+};
+
+async function loadChatThread() {
+  if (!currentChat.itemId) return;
+
+  const container = document.getElementById("chatMessagesThread");
+  if (!container) return;
+
+  try {
+    const res = await fetch(`/api/messages/thread?item_id=${currentChat.itemId}&other_user_id=${currentChat.partnerId || 0}`);
+    const data = await res.json();
+
+    if (!data.success) {
+      container.innerHTML = `<div class="text-danger small text-center my-auto">${data.message}</div>`;
+      return;
+    }
+
+    const messages = data.messages || [];
+    if (messages.length === 0) {
+      container.innerHTML = `
+        <div class="text-center text-muted small my-auto p-3">
+          <i class="bi bi-chat-heart text-sky fs-3 d-block mb-2"></i>
+          <strong>No messages yet!</strong><br />
+          Ask about the item's condition, exchange preferences, or propose a meetup.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = messages.map((m) => {
+      const isMine = currentUser && m.sender_id === currentUser.id;
+      const timeStr = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return `
+        <div class="message-bubble ${isMine ? 'outgoing' : 'incoming'}">
+          <div class="small fw-semibold mb-0.5 opacity-75" style="font-size:0.72rem;">${isMine ? 'You' : m.sender_name}</div>
+          <div>${m.message}</div>
+          <div class="message-time">${timeStr}</div>
+        </div>
+      `;
+    }).join("");
+
+    container.scrollTop = container.scrollHeight;
+  } catch (err) {
+    console.error("Chat load error:", err);
+  }
+}
+
+window.sendQuickChip = function (text) {
+  const input = document.getElementById("chatInputMessage");
+  if (input) {
+    input.value = text;
+    document.getElementById("btnChatSend")?.click();
+  }
+};
+
+const chatSendForm = document.getElementById("chatSendForm");
+if (chatSendForm) {
+  chatSendForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("chatInputMessage");
+    const msg = (input?.value || "").trim();
+    if (!msg || !currentChat.itemId) return;
+
+    input.value = "";
+    try {
+      const res = await fetch("/api/messages/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item_id: currentChat.itemId,
+          recipient_id: currentChat.partnerId,
+          message: msg
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        await loadChatThread();
+        updateNavUnreadCount();
+      } else {
+        showToast(data.message || "Failed to deliver message.");
+      }
+    } catch (err) {
+      showToast("Error sending message: " + err.message);
+    }
+  });
+}
+
+// Conversations List Drawer
+window.openConversationsList = async function () {
+  if (!currentUser) {
+    showToast("Please log in to view your inquiries & messages.");
+    openAuthModal("login");
+    return;
+  }
+
+  const drawerEl = document.getElementById("conversationsDrawer");
+  const content = document.getElementById("conversationsListContent");
+  if (drawerEl && window.bootstrap && bootstrap.Offcanvas) {
+    bootstrap.Offcanvas.getOrCreateInstance(drawerEl).show();
+  }
+
+  try {
+    const res = await fetch("/api/messages/conversations");
+    const data = await res.json();
+
+    if (!data.success || !data.conversations || data.conversations.length === 0) {
+      content.innerHTML = `
+        <div class="text-center py-5 text-muted p-4">
+          <i class="bi bi-chat-square-text text-sky fs-2 d-block mb-2"></i>
+          <strong>No inquiries yet.</strong><br />
+          Click the chat button on any item card to start an inquiry with the owner!
+        </div>
+      `;
+      return;
+    }
+
+    content.innerHTML = data.conversations.map((c) => {
+      const timeStr = new Date(c.last_message_at).toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return `
+        <a href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3" onclick="openChatFromList(${c.item_id}, ${c.partner_id}, '${escapeHtml(c.item_title)}'); return false;">
+          <img src="${c.item_image || 'assets/img/phone.svg'}" style="width:48px;height:48px;object-fit:cover;border-radius:10px;" alt="" />
+          <div class="flex-grow-1 overflow-hidden">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <strong class="text-dark small text-truncate" style="max-width:180px;">${c.partner_name}</strong>
+              <small class="text-muted" style="font-size:0.7rem;">${timeStr}</small>
+            </div>
+            <div class="small text-sky fw-semibold text-truncate mb-1">${c.item_title}</div>
+            <p class="small text-secondary text-truncate mb-0" style="font-size:0.8rem;">${c.last_message}</p>
+          </div>
+          ${c.unread_count > 0 ? `<span class="badge bg-danger rounded-pill">${c.unread_count}</span>` : ''}
+        </a>
+      `;
+    }).join("");
+  } catch (err) {
+    content.innerHTML = `<div class="alert alert-danger m-3">${err.message}</div>`;
+  }
+};
+
+window.openChatFromList = function (itemId, partnerId, itemTitle) {
+  bootstrap.Offcanvas.getInstance(document.getElementById("conversationsDrawer"))?.hide();
+  currentChat.itemId = itemId;
+  currentChat.partnerId = partnerId;
+  const drawerEl = document.getElementById("chatDrawer");
+  if (drawerEl && window.bootstrap && bootstrap.Offcanvas) {
+    bootstrap.Offcanvas.getOrCreateInstance(drawerEl).show();
+    loadChatThread();
+  }
+};
+
+async function updateNavUnreadCount() {
+  try {
+    const res = await fetch("/api/messages/unread-count");
+    const data = await res.json();
+    const badge = document.getElementById("navChatUnreadBadge");
+    if (badge) {
+      const count = Number(data.count || 0);
+      badge.textContent = count;
+      badge.classList.toggle("d-none", count === 0);
+    }
+  } catch (_) {}
+}
+
+setInterval(updateNavUnreadCount, 15000);
+setTimeout(updateNavUnreadCount, 1500);
+
+// =========================================================
+// 3-STEP GUIDED LISTING WIZARD
+// =========================================================
+
+let currentWizardStep = 1;
+
+window.goToWizardStep = function (step) {
+  if (step < 1 || step > 3) return;
+  // If moving forward, validate current step
+  if (step > currentWizardStep && !validateWizardStep(currentWizardStep)) {
+    return;
+  }
+  setWizardStep(step);
+};
+
+window.wizardStepNext = function () {
+  if (!validateWizardStep(currentWizardStep)) return;
+  if (currentWizardStep < 3) {
+    setWizardStep(currentWizardStep + 1);
+  }
+};
+
+window.wizardStepPrev = function () {
+  if (currentWizardStep > 1) {
+    setWizardStep(currentWizardStep - 1);
+  }
+};
+
+function setWizardStep(step) {
+  currentWizardStep = step;
+
+  // Toggle step panes
+  document.getElementById("wizardStep1").classList.toggle("d-none", step !== 1);
+  document.getElementById("wizardStep2").classList.toggle("d-none", step !== 2);
+  document.getElementById("wizardStep3").classList.toggle("d-none", step !== 3);
+
+  // Update step nodes
+  for (let s = 1; s <= 3; s++) {
+    const node = document.getElementById(`wizardNode${s}`);
+    if (node) {
+      node.classList.toggle("active", s === step);
+      node.classList.toggle("completed", s < step);
+    }
+  }
+
+  // Update footer buttons
+  const prevBtn = document.getElementById("btnWizardPrev");
+  const nextBtn = document.getElementById("btnWizardNext");
+  const submitBtn = document.getElementById("btnSubmitItem");
+
+  if (prevBtn) prevBtn.style.visibility = step > 1 ? "visible" : "hidden";
+  if (nextBtn) {
+    nextBtn.classList.toggle("d-none", step === 3);
+    if (step === 1) nextBtn.innerHTML = `Next: Trade Terms <i class="bi bi-arrow-right ms-1"></i>`;
+    if (step === 2) nextBtn.innerHTML = `Next: Verification <i class="bi bi-arrow-right ms-1"></i>`;
+  }
+  if (submitBtn) submitBtn.classList.toggle("d-none", step !== 3);
+}
+
+function validateWizardStep(step) {
+  if (step === 1) {
+    const title = document.getElementById("postTitleInput")?.value.trim();
+    const desc = document.getElementById("postDescInput")?.value.trim();
+    if (!title) {
+      showToast("Please enter an item title.");
+      document.getElementById("postTitleInput")?.focus();
+      return false;
+    }
+    if (!desc) {
+      showToast("Please provide a brief item description.");
+      document.getElementById("postDescInput")?.focus();
+      return false;
+    }
+  }
+  if (step === 2) {
+    const wanted = document.getElementById("postWantedInput")?.value.trim();
+    const estVal = document.getElementById("postEstValInput")?.value.trim();
+    if (!wanted) {
+      showToast("Please specify what you want in exchange.");
+      document.getElementById("postWantedInput")?.focus();
+      return false;
+    }
+    if (!estVal || Number(estVal) <= 0) {
+      showToast("Please enter an estimated market value in Naira.");
+      document.getElementById("postEstValInput")?.focus();
+      return false;
+    }
+  }
+  return true;
+}
+
+window.verifyWizardSerial = async function () {
+  const serial = document.getElementById("wizardSerialInput")?.value.trim();
+  const statusEl = document.getElementById("wizardSerialStatus");
+  if (!serial) {
+    showToast("Enter a serial number or IMEI to check.");
+    return;
+  }
+  if (statusEl) statusEl.innerHTML = `<span class="spinner-border spinner-border-sm text-sky"></span> Checking anti-theft database...`;
+  try {
+    const res = await fetch(`/api/items/check_serial?serial=${encodeURIComponent(serial)}`);
+    const data = await res.json();
+    if (data.flagged) {
+      statusEl.innerHTML = `<span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> WARNING: This Serial/IMEI is flagged as reported/stolen!</span>`;
+    } else {
+      statusEl.innerHTML = `<span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Serial clean &amp; verified! Zero security flags found.</span>`;
+    }
+  } catch (err) {
+    if (statusEl) statusEl.innerHTML = `<span class="text-muted">Verification check error.</span>`;
+  }
+};
+
+// =========================================================
+// STRUCTURED BARTER NEGOTIATOR (SWAP MODAL HELPERS)
+// =========================================================
+
+window.populateUserInventoryForOffers = async function () {
+  const select = document.getElementById("offerInventorySelect");
+  if (!select) return;
+
+  select.innerHTML = `<option value="custom">-- Type a custom / unlisted item --</option>`;
+  if (!currentUser) return;
+
+  try {
+    const res = await fetch("/api/items?mine=1");
+    const data = await res.json();
+    if (data.success && data.items && data.items.length > 0) {
+      data.items.forEach((it) => {
+        const opt = document.createElement("option");
+        opt.value = it.title;
+        opt.textContent = `My Listed Item: ${it.title} (${formatNaira(it.est_value)})`;
+        select.appendChild(opt);
+      });
+    }
+  } catch (_) {}
+};
+
+window.handleInventorySelect = function (val) {
+  const offerInput = document.getElementById("offerItem");
+  if (val === "custom") {
+    if (offerInput) offerInput.value = "";
+  } else {
+    if (offerInput) offerInput.value = val;
+  }
+  updateOfferPreview();
+};
+
+window.setCashTopup = function (val) {
+  const cashInput = document.getElementById("offerCash");
+  if (cashInput) {
+    cashInput.value = val;
+    updateOfferPreview();
+  }
+};
+
+window.updateOfferPreview = function () {
+  const itemVal = document.getElementById("offerItem")?.value.trim() || "Specify Offered Item";
+  const cashVal = document.getElementById("offerCash")?.value.trim() || "₦0 (Straight Swap)";
+  const previewTitle = document.getElementById("offerPreviewTitle");
+  const previewCash = document.getElementById("offerPreviewCash");
+
+  if (previewTitle) previewTitle.textContent = itemVal;
+  if (previewCash) previewCash.textContent = cashVal;
+};
+
+// Hook inventory loader on openSwapModal
+const origOpenSwapModal = window.openSwapModal;
+window.openSwapModal = function (id) {
+  if (typeof origOpenSwapModal === "function") {
+    origOpenSwapModal(id);
+  }
+  populateUserInventoryForOffers();
+  updateOfferPreview();
+};
+
+function escapeHtml(str) {
+  return String(str || "").replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+}

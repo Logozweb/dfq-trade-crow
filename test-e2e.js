@@ -1,5 +1,6 @@
 const http = require('http');
 const app = require('./server/app');
+const { db } = require('./server/db');
 
 const server = app.listen(5099, '127.0.0.1', async () => {
   console.log('[Test] Server listening on port 5099 for automated verification.');
@@ -118,19 +119,56 @@ const server = app.listen(5099, '127.0.0.1', async () => {
     if (!createRes.data.success) throw new Error('Create item failed');
     const newItemId = createRes.data.item_id;
 
-    // 10. Propose Trade Offer on Item #101
+    // 10. Propose Trade Offer on an Active item owned by user 1
     console.log('\n--- 10. Testing Swap Offer Creation ---');
+    // Ensure item 101 is active for clean repeatable tests
+    db.prepare("UPDATE items SET status = 'Active' WHERE id = 101").run();
+    const targetId = 101;
     const offerRes = await request('POST', '/api/offers.php?action=create', {
-      item_id: 101,
+      item_id: targetId,
       offered_item: 'PlayStation 5 + 2 DualSense Controllers',
       cash_topup: '₦100,000 cash balance',
       note: 'Can do meetup in Lekki phase 1 today.'
     });
     console.log(`Status: ${offerRes.status}, Offer Created ID: ${offerRes.data.offer_id}`);
     if (!offerRes.data.success) throw new Error('Create offer failed');
+    const offerId = offerRes.data.offer_id;
+
+    // 11. Send Direct In-App Inquiry Message on Item
+    console.log('\n--- 11. Testing In-App Message Inquiry ---');
+    const msgRes = await request('POST', '/api/messages/send', {
+      item_id: targetId,
+      message: 'Hello, is the item still in pristine condition?'
+    });
+    console.log(`Status: ${msgRes.status}, Message Sent ID: ${msgRes.data.message_id}`);
+    if (!msgRes.data.success) throw new Error('Send message failed');
+
+    const threadRes = await request('GET', `/api/messages/thread?item_id=${targetId}`);
+    console.log(`Status: ${threadRes.status}, Messages in Thread: ${threadRes.data.messages.length}`);
+    if (!threadRes.data.success || threadRes.data.messages.length === 0) throw new Error('Get thread failed');
+
+    // 12. Dual-OTP Handover Verification
+    console.log('\n--- 12. Testing Escrow Lock & Dual-OTP Handover ---');
+    // Login as admin/owner
+    await request('POST', '/api/auth.php?action=login', { email: 'demo@dfqtradecrow.com', password: 'password' });
+    const escrowRes = await request('POST', '/api/offers.php?action=respond', {
+      offer_id: offerId,
+      decision: 'In Escrow'
+    });
+    console.log(`Status: ${escrowRes.status}, Move to Escrow: ${escrowRes.data.message}`);
+    const ownerOtp = escrowRes.data.owner_otp;
+    const proposerOtp = escrowRes.data.proposer_otp;
+
+    // Owner submits Proposer's OTP
+    const verifyOtpRes = await request('POST', '/api/offers/verify-otp', {
+      offer_id: offerId,
+      otp: proposerOtp
+    });
+    console.log(`Status: ${verifyOtpRes.status}, Handover Verification: ${verifyOtpRes.data.message}`);
+    if (!verifyOtpRes.data.success) throw new Error('Dual-OTP verification failed');
 
     console.log('\n=============================================');
-    console.log('🎉 ALL 10 CORE TESTS PASSED WITH 100% SUCCESS!');
+    console.log('🎉 ALL 12 END-TO-END TESTS PASSED WITH 100% SUCCESS!');
     console.log('=============================================');
 
   } catch (err) {

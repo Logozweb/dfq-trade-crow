@@ -52,7 +52,7 @@ function renderOffers() {
     let actionButtons = "";
     if (offer.status === "Pending") {
       actionButtons = `
-        <button type="button" class="btn btn-outline-danger btn-sm px-3" onclick="respondOffer(${offer.id}, 'Declined')">Decline</button>
+        <button type="button" class="btn btn-outline-danger btn-sm px-3" onclick="openDeclineModal(${offer.id})">Decline</button>
         <button type="button" class="btn btn-outline-sky btn-sm px-3" onclick="openCounterModal(${offer.id})">Counter Offer</button>
         <button type="button" class="btn btn-primary btn-sm px-3" onclick="respondOffer(${offer.id}, 'In Escrow')"><i class="bi bi-shield-lock me-1"></i> Lock Escrow Hold</button>
         <button type="button" class="btn btn-sky btn-sm px-3" onclick="respondOffer(${offer.id}, 'Accepted')"><i class="bi bi-check-lg me-1"></i> Accept Swap</button>
@@ -60,7 +60,7 @@ function renderOffers() {
     } else if (offer.status === "In Escrow") {
       actionButtons = `
         <button type="button" class="btn btn-outline-danger btn-sm px-3" onclick="respondOffer(${offer.id}, 'Pending')">Cancel Hold</button>
-        <button type="button" class="btn btn-success btn-sm px-3.5" onclick="respondOffer(${offer.id}, 'Accepted')"><i class="bi bi-check2-all me-1"></i> Confirm Handover &amp; Complete</button>
+        <button type="button" class="btn btn-success btn-sm px-3" onclick="openHandoverOtpModal(${offer.id}, '${offer.owner_otp || '4829'}')"><i class="bi bi-shield-check me-1"></i> Dual-OTP Handover</button>
       `;
     } else if (offer.status === "Accepted") {
       actionButtons =
@@ -127,9 +127,32 @@ function renderMyListings() {
     const isSwapped = item.status === "Swapped";
     const isFeatured = Number(item.is_featured) === 1;
     let pawnBadge = "";
+    let pawnActions = "";
     if (item.mode === "Pawn / Quick Sale" && item.pawn_due_date) {
       const daysLeft = Math.ceil((new Date(item.pawn_due_date) - new Date()) / (1000 * 60 * 60 * 24));
-      pawnBadge = `<div class="small text-warning-emphasis fw-semibold mt-1"><i class="bi bi-stopwatch"></i> Buyback ${formatNaira(item.pawn_buyback)} (${daysLeft > 0 ? daysLeft + "d left" : "Due"}) &bull; <a href="ticket.html?id=${item.id}" target="_blank">Ticket</a></div>`;
+      const isRedeemed = Boolean(item.redeemed_at);
+      const isLiquidated = Number(item.is_liquidated) === 1;
+
+      if (isRedeemed) {
+        pawnBadge = `<div class="badge bg-success-subtle text-success mt-1"><i class="bi bi-patch-check-fill me-1"></i>Redeemed &bull; Cleared</div>`;
+      } else if (isLiquidated) {
+        pawnBadge = `<div class="badge bg-danger-subtle text-danger mt-1"><i class="bi bi-tag-fill me-1"></i>Liquidated Clearance</div>`;
+      } else {
+        const pctLeft = Math.max(0, Math.min(100, Math.round((daysLeft / 30) * 100)));
+        pawnBadge = `
+          <div class="mt-1 small">
+            <div class="text-warning-emphasis fw-bold"><i class="bi bi-stopwatch"></i> ${daysLeft > 0 ? daysLeft + "d left to redeem" : "Overdue"} &bull; Buyback: ${formatNaira(item.pawn_buyback)}</div>
+            <div class="progress mt-1" style="height: 4px; max-width: 160px;">
+              <div class="progress-bar ${daysLeft <= 3 ? 'bg-danger' : 'bg-warning'}" style="width: ${pctLeft}%;"></div>
+            </div>
+            <a href="ticket.html?id=${item.id}" target="_blank" class="small fw-semibold text-sky">View Ticket</a>
+          </div>
+        `;
+        pawnActions = `
+          <button type="button" class="btn btn-sm btn-success" onclick="redeemPawnCollateral(${item.id})" title="Settle buyback & redeem ownership"><i class="bi bi-wallet2 me-1"></i>Redeem</button>
+          <button type="button" class="btn btn-sm btn-outline-warning" onclick="liquidatePawnCollateral(${item.id})" title="Convert to Quick Sale clearance"><i class="bi bi-tag me-1"></i>Liquidate</button>
+        `;
+      }
     }
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -148,6 +171,7 @@ function renderMyListings() {
       <td class="py-3">${isSwapped ? `<span class="badge status-swapped px-2.5 py-1 rounded-pill">Swapped</span>` : `<span class="badge status-accepted px-2.5 py-1 rounded-pill">${item.status}</span>`}</td>
       <td class="pe-4 py-3 text-end">
         <div class="btn-group btn-group-sm">
+          ${pawnActions}
           ${!isFeatured && !isSwapped ? `<button type="button" class="btn btn-sky" onclick="boostItem(${item.id})" title="Pin to top using 1 Spotlight Credit"><i class="bi bi-lightning-fill"></i> Boost</button>` : ""}
           <button type="button" class="btn btn-outline-sky" onclick="toggleItemStatus(${item.id})">${isSwapped ? "Relist" : "Mark Swapped"}</button>
           <button type="button" class="btn btn-outline-danger" onclick="deleteItem(${item.id})"><i class="bi bi-trash"></i></button>
@@ -258,7 +282,21 @@ document.getElementById("counterForm").addEventListener("submit", async (e) => {
   }
 });
 
+let selectedReviewTags = [];
+
+window.toggleReviewTag = function (btn, tag) {
+  if (selectedReviewTags.includes(tag)) {
+    selectedReviewTags = selectedReviewTags.filter(t => t !== tag);
+    btn.classList.remove('bg-sky-primary', 'text-white');
+  } else {
+    selectedReviewTags.push(tag);
+    btn.classList.add('bg-sky-primary', 'text-white');
+  }
+};
+
 window.openRateModal = function (offerId, partnerName) {
+  selectedReviewTags = [];
+  document.querySelectorAll("#rateAttributeTags .quick-chip").forEach(b => b.classList.remove('bg-sky-primary', 'text-white'));
   document.getElementById("rateOfferId").value = offerId;
   document.getElementById("ratePartnerText").textContent = `Leave a rating for ${partnerName} on this completed swap:`;
   new bootstrap.Modal(document.getElementById("rateModal")).show();
@@ -272,7 +310,8 @@ document.getElementById("rateForm").addEventListener("submit", async (e) => {
     body: JSON.stringify({
       offer_id: Number(document.getElementById("rateOfferId").value),
       rating: Number(document.getElementById("rateScore").value),
-      comment: document.getElementById("rateComment").value.trim()
+      comment: document.getElementById("rateComment").value.trim(),
+      tags: selectedReviewTags
     })
   });
   const data = await res.json();
@@ -283,6 +322,61 @@ document.getElementById("rateForm").addEventListener("submit", async (e) => {
     await loadDashboardData();
   }
 });
+
+window.openDeclineModal = function (offerId) {
+  document.getElementById("declineOfferId").value = offerId;
+  new bootstrap.Modal(document.getElementById("declineOfferModal")).show();
+};
+
+document.getElementById("declineOfferForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const offerId = Number(document.getElementById("declineOfferId").value);
+  const reason = document.querySelector('input[name="declineReason"]:checked')?.value || 'Value mismatch';
+
+  const res = await fetch("api/offers.php?action=respond", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ offer_id: offerId, decision: "Declined", decline_reason: reason })
+  });
+  const data = await res.json();
+  if (data.success) {
+    bootstrap.Modal.getInstance(document.getElementById("declineOfferModal"))?.hide();
+    showDashToast("Offer declined (" + reason + ")");
+    await loadDashboardData();
+  }
+});
+
+window.redeemPawnCollateral = async function (itemId) {
+  if (!confirm("Are you ready to settle the buyback total and redeem this collateral?")) return;
+  try {
+    const res = await fetch("/api/pawn/redeem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item_id: itemId })
+    });
+    const data = await res.json();
+    showDashToast(data.message);
+    if (data.success) await loadDashboardData();
+  } catch (err) {
+    showDashToast("Error: " + err.message);
+  }
+};
+
+window.liquidatePawnCollateral = async function (itemId) {
+  if (!confirm("Convert this unredeemed collateral to a Quick Sale listing on the marketplace?")) return;
+  try {
+    const res = await fetch("/api/pawn/liquidate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item_id: itemId })
+    });
+    const data = await res.json();
+    showDashToast(data.message);
+    if (data.success) await loadDashboardData();
+  } catch (err) {
+    showDashToast("Error: " + err.message);
+  }
+};
 
 window.toggleItemStatus = async function (itemId) {
   const res = await fetch("api/items.php?action=toggle_status", {
@@ -353,3 +447,184 @@ async function loadDashboardData() {
 }
 
 loadDashboardData();
+
+
+// =========================================================
+// DASHBOARD INQUIRIES & MESSAGING TAB CONTROLLER
+// =========================================================
+
+let activeDashChat = {
+  itemId: null,
+  partnerId: null,
+  partnerName: ""
+};
+
+async function loadDashboardConversations() {
+  const listEl = document.getElementById("dashConvosList");
+  if (!listEl) return;
+
+  try {
+    const res = await fetch("/api/messages/conversations");
+    const data = await res.json();
+
+    const badge = document.getElementById("badgeChatCount");
+    const totalUnread = (data.conversations || []).reduce((acc, c) => acc + (c.unread_count || 0), 0);
+    if (badge) {
+      badge.textContent = totalUnread;
+      badge.classList.toggle("d-none", totalUnread === 0);
+    }
+
+    if (!data.success || !data.conversations || data.conversations.length === 0) {
+      listEl.innerHTML = `<div class="p-4 text-center text-muted small">No inquiries or buyer chats yet.</div>`;
+      return;
+    }
+
+    listEl.innerHTML = data.conversations.map((c) => {
+      const timeStr = new Date(c.last_message_at).toLocaleDateString([], { month: "short", day: "numeric" });
+      const isActive = activeDashChat.itemId === c.item_id && activeDashChat.partnerId === c.partner_id;
+      return `
+        <a href="#" class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-3 ${isActive ? 'bg-sky-tint' : ''}" onclick="selectDashConversation(${c.item_id}, ${c.partner_id}, '${escapeHtml(c.partner_name)}', '${escapeHtml(c.item_title)}'); return false;">
+          <img src="${c.item_image || 'assets/img/phone.svg'}" style="width:44px;height:44px;object-fit:cover;border-radius:10px;" alt="" />
+          <div class="flex-grow-1 overflow-hidden">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <strong class="text-dark small text-truncate" style="max-width:140px;">${c.partner_name}</strong>
+              <small class="text-muted" style="font-size:0.68rem;">${timeStr}</small>
+            </div>
+            <div class="small text-sky fw-semibold text-truncate mb-0.5">${c.item_title}</div>
+            <p class="small text-secondary text-truncate mb-0" style="font-size:0.75rem;">${c.last_message}</p>
+          </div>
+          ${c.unread_count > 0 ? `<span class="badge bg-danger rounded-pill">${c.unread_count}</span>` : ""}
+        </a>
+      `;
+    }).join("");
+  } catch (err) {
+    console.error("Error loading dashboard convos:", err);
+  }
+}
+
+window.selectDashConversation = async function (itemId, partnerId, partnerName, itemTitle) {
+  activeDashChat.itemId = itemId;
+  activeDashChat.partnerId = partnerId;
+  activeDashChat.partnerName = partnerName;
+
+  document.getElementById("dashChatTitle").textContent = `${partnerName} • ${itemTitle}`;
+  document.getElementById("dashChatSendForm")?.classList.remove("d-none");
+
+  await loadDashChatMessages();
+  loadDashboardConversations();
+};
+
+async function loadDashChatMessages() {
+  const container = document.getElementById("dashChatMessages");
+  if (!container || !activeDashChat.itemId) return;
+
+  try {
+    const res = await fetch(`/api/messages/thread?item_id=${activeDashChat.itemId}&other_user_id=${activeDashChat.partnerId}`);
+    const data = await res.json();
+
+    if (!data.success || !data.messages || data.messages.length === 0) {
+      container.innerHTML = `<div class="text-center text-muted small my-auto">No messages exchanged yet. Send a reply below.</div>`;
+      return;
+    }
+
+    container.innerHTML = data.messages.map((m) => {
+      const isMine = m.sender_id !== activeDashChat.partnerId;
+      const timeStr = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return `
+        <div class="message-bubble ${isMine ? 'outgoing' : 'incoming'}">
+          <div class="small fw-semibold mb-0.5 opacity-75" style="font-size:0.72rem;">${isMine ? 'You' : m.sender_name}</div>
+          <div>${m.message}</div>
+          <div class="message-time">${timeStr}</div>
+        </div>
+      `;
+    }).join("");
+    container.scrollTop = container.scrollHeight;
+  } catch (err) {
+    console.error("Error loading chat messages:", err);
+  }
+}
+
+const dashChatSendForm = document.getElementById("dashChatSendForm");
+if (dashChatSendForm) {
+  dashChatSendForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("dashChatInput");
+    const msg = (input?.value || "").trim();
+    if (!msg || !activeDashChat.itemId) return;
+
+    input.value = "";
+    try {
+      const res = await fetch("/api/messages/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item_id: activeDashChat.itemId,
+          recipient_id: activeDashChat.partnerId,
+          message: msg
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        await loadDashChatMessages();
+        loadDashboardConversations();
+      } else {
+        showDashToast(data.message || "Failed to send message.");
+      }
+    } catch (err) {
+      showDashToast("Error: " + err.message);
+    }
+  });
+}
+
+// =========================================================
+// ESCROW DUAL-OTP HANDOVER VERIFICATION
+// =========================================================
+
+window.openHandoverOtpModal = function (offerId, myCode) {
+  document.getElementById("currentOtpOfferId").value = offerId;
+  document.getElementById("myOtpCodeDisplay").textContent = myCode || "4829";
+  document.getElementById("inputPartnerOtp").value = "";
+  new bootstrap.Modal(document.getElementById("otpHandoverModal")).show();
+};
+
+window.confirmHandoverOtp = async function () {
+  const offerId = document.getElementById("currentOtpOfferId")?.value;
+  const partnerOtp = document.getElementById("inputPartnerOtp")?.value.trim();
+
+  if (!partnerOtp) {
+    showDashToast("Please enter the 4-digit code shown on the trader's phone.");
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/offers/verify-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ offer_id: offerId, otp: partnerOtp })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      bootstrap.Modal.getInstance(document.getElementById("otpHandoverModal"))?.hide();
+      showDashToast("🎉 Dual-OTP Handover Verified! Escrow released.");
+      await loadDashboardData();
+    } else {
+      showDashToast(data.message || "Invalid code. Please try again.");
+    }
+  } catch (err) {
+    showDashToast("Handover error: " + err.message);
+  }
+};
+
+function escapeHtml(str) {
+  return String(str || "").replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+}
+
+// Hook conversation loader into loadDashboardData
+const origLoadDashboardData = loadDashboardData;
+loadDashboardData = async function () {
+  if (typeof origLoadDashboardData === "function") {
+    await origLoadDashboardData();
+  }
+  await loadDashboardConversations();
+};

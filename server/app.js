@@ -173,13 +173,49 @@ function handleMe(req, res) {
     return sendJson(res, true, 'Guest', { authenticated: false });
   }
 
-  const user = db.prepare('SELECT id, full_name, email, phone, location, referral_code, spotlight_credits, is_admin FROM users WHERE id = ?').get(Number(req.session.userId));
+  const user = db.prepare('SELECT id, full_name, email, phone, location, referral_code, spotlight_credits, is_admin, COALESCE(kyc_tier, 1) AS kyc_tier FROM users WHERE id = ?').get(Number(req.session.userId));
   if (!user) {
     req.session.destroy();
     return sendJson(res, true, 'Guest', { authenticated: false });
   }
 
   return sendJson(res, true, 'Authenticated', { authenticated: true, user });
+}
+
+function handleReferralInfo(req, res) {
+  const code = (req.query.code || '').trim().toUpperCase();
+  if (!code) return sendJson(res, false, 'No referral code provided.', {}, 400);
+
+  const inviter = db.prepare('SELECT id, full_name, location FROM users WHERE referral_code = ?').get(code);
+  if (!inviter) {
+    return sendJson(res, false, 'Referral code not found.', {}, 404);
+  }
+  return sendJson(res, true, 'Referral valid.', {
+    inviter_name: inviter.full_name,
+    code: code,
+    reward: '1 Free Spotlight Boost + Verified Member Perks'
+  });
+}
+
+function handleKycVerify(req, res) {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const tier = parseInt(req.body.tier || '2', 10);
+  const ninBvn = (req.body.nin_bvn || '').trim();
+  const businessName = (req.body.business_name || '').trim();
+  const businessAddress = (req.body.business_address || '').trim();
+
+  if (tier === 2) {
+    db.prepare('UPDATE users SET kyc_tier = 2, nin_bvn = ? WHERE id = ?').run(ninBvn || 'NIN-VERIFIED', userId);
+    return sendJson(res, true, 'Tier 2 Verification Approved! Blue Shield Badge unlocked.', { kyc_tier: 2 });
+  } else if (tier === 3) {
+    if (!businessName) return sendJson(res, false, 'Business name required for Pro Merchant status.', {}, 400);
+    db.prepare('UPDATE users SET kyc_tier = 3, business_name = ?, business_address = ? WHERE id = ?').run(businessName, businessAddress || 'Storefront Verified', userId);
+    return sendJson(res, true, 'Tier 3 Pro Merchant Approved! Gold Seal Badge unlocked.', { kyc_tier: 3 });
+  }
+
+  return sendJson(res, false, 'Invalid KYC tier.', {}, 400);
 }
 
 function handleLogout(req, res) {
@@ -196,14 +232,18 @@ app.all('/api/auth.php', (req, res) => {
   if (action === 'login' && req.method === 'POST') return handleLogin(req, res);
   if (action === 'me') return handleMe(req, res);
   if (action === 'logout') return handleLogout(req, res);
+  if (action === 'referral_info') return handleReferralInfo(req, res);
+  if (action === 'kyc_verify' && req.method === 'POST') return handleKycVerify(req, res);
   return sendJson(res, false, 'Invalid auth action.', {}, 400);
 });
 
-// RESTful aliases for auth
+// RESTful aliases for auth & KYC
 app.post('/api/auth/register', handleRegister);
 app.post('/api/auth/login', handleLogin);
 app.get('/api/auth/me', handleMe);
+app.get('/api/auth/referral-info', handleReferralInfo);
 app.all('/api/auth/logout', handleLogout);
+app.post('/api/kyc/verify', handleKycVerify);
 
 // ==========================================
 // ITEMS API ROUTES
@@ -219,6 +259,7 @@ function handleListItems(req, res) {
 
   let sql = `
     SELECT i.*, u.full_name AS owner_name, u.phone AS owner_phone,
+           COALESCE(u.kyc_tier, 1) AS owner_kyc_tier,
            COALESCE(ROUND((SELECT AVG(rating) FROM trader_reviews WHERE target_user_id = u.id), 1), 5.0) AS owner_rating,
            (SELECT COUNT(*) FROM trader_reviews WHERE target_user_id = u.id) AS review_count
     FROM items i
@@ -576,7 +617,13 @@ function handleRespondOffer(req, res) {
   }
 
   if (['In Escrow', 'Accepted', 'Declined', 'Pending'].includes(decision)) {
-    db.prepare('UPDATE swap_offers SET status = ? WHERE id = ?').run(decision, offerId);
+    // Generate 4-digit OTPs when entering Escrow or Accepted
+    let proposerOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    let ownerOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    let declineReason = (decision === 'Declined') ? (req.body.decline_reason || 'Value mismatch') : null;
+
+    db.prepare('UPDATE swap_offers SET status = ?, proposer_otp = COALESCE(proposer_otp, ?), owner_otp = COALESCE(owner_otp, ?), decline_reason = COALESCE(?, decline_reason) WHERE id = ?')
+      .run(decision, proposerOtp, ownerOtp, declineReason, offerId);
 
     if (decision === 'In Escrow') {
       db.prepare(`UPDATE items SET status = 'In Escrow' WHERE id = ?`).run(offer.item_id);
@@ -586,10 +633,87 @@ function handleRespondOffer(req, res) {
       db.prepare(`UPDATE items SET status = 'Active' WHERE id = ?`).run(offer.item_id);
     }
 
-    return sendJson(res, true, `Swap status updated to ${decision}.`);
+    return sendJson(res, true, `Swap status updated to ${decision}.`, { proposer_otp: proposerOtp, owner_otp: ownerOtp });
   }
 
   return sendJson(res, false, 'Invalid decision action.', {}, 400);
+}
+
+function handleFundEscrow(req, res) {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const offerId = parseInt(req.body.offer_id || '0', 10);
+  const offer = db.prepare('SELECT id, proposer_id, owner_id FROM swap_offers WHERE id = ?').get(offerId);
+  if (!offer || (Number(offer.proposer_id) !== userId && Number(offer.owner_id) !== userId)) {
+    return sendJson(res, false, 'Offer not found or unauthorized.', {}, 403);
+  }
+
+  db.prepare(`UPDATE swap_offers SET escrow_funded = 1 WHERE id = ?`).run(offerId);
+  return sendJson(res, true, 'Cash balance funded into DFQ Escrow Hold! Funds are protected until dual-OTP handover is confirmed.');
+}
+
+function handleRedeemPawn(req, res) {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const itemId = parseInt(req.body.item_id || '0', 10);
+  const item = db.prepare('SELECT id, user_id, title, mode, pawn_buyback FROM items WHERE id = ? AND user_id = ?').get(itemId, userId);
+  if (!item || item.mode !== 'Pawn / Quick Sale') {
+    return sendJson(res, false, 'Pawn item not found or unauthorized.', {}, 404);
+  }
+
+  db.prepare(`UPDATE items SET status = 'Active', redeemed_at = CURRENT_TIMESTAMP WHERE id = ?`).run(itemId);
+  return sendJson(res, true, `Collateral "${item.title}" successfully redeemed! Official digital pawn receipt cleared and full ownership returned to you.`, {
+    item_id: itemId,
+    redeemed: true
+  });
+}
+
+function handleLiquidatePawn(req, res) {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const itemId = parseInt(req.body.item_id || '0', 10);
+  const item = db.prepare('SELECT id, user_id, title, mode FROM items WHERE id = ? AND user_id = ?').get(itemId, userId);
+  if (!item) return sendJson(res, false, 'Item not found.', {}, 404);
+
+  db.prepare(`UPDATE items SET mode = 'Cash or Swap', is_liquidated = 1, status = 'Active', wanted = 'Quick Sale Cash Clearance' WHERE id = ?`).run(itemId);
+  return sendJson(res, true, `Item converted to Quick Sale / Liquidated Collateral on marketplace feed.`);
+}
+
+function handleVerifyHandoverOtp(req, res) {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const offerId = parseInt(req.body.offer_id || '0', 10);
+  const enteredOtp = (req.body.otp || '').trim();
+
+  const offer = db.prepare(`SELECT * FROM swap_offers WHERE id = ?`).get(offerId);
+  if (!offer) {
+    return sendJson(res, false, 'Swap offer not found.', {}, 404);
+  }
+
+  const isOwner = Number(offer.owner_id) === userId;
+  const isProposer = Number(offer.proposer_id) === userId;
+
+  if (!isOwner && !isProposer) {
+    return sendJson(res, false, 'Unauthorized for this trade offer.', {}, 403);
+  }
+
+  // The partner's OTP that this user must provide
+  const expectedOtp = isOwner ? offer.proposer_otp : offer.owner_otp;
+  if (!enteredOtp || enteredOtp !== expectedOtp) {
+    return sendJson(res, false, 'Invalid verification code. Please check the 4-digit code shown on the partner\'s device.', {}, 400);
+  }
+
+  // Successfully verified! Mark as Swapped & Accepted
+  db.prepare(`UPDATE swap_offers SET status = 'Accepted' WHERE id = ?`).run(offerId);
+  db.prepare(`UPDATE items SET status = 'Swapped' WHERE id = ?`).run(offer.item_id);
+
+  return sendJson(res, true, 'Dual-OTP Handover Verified! Escrow released and trade marked as successfully completed.', {
+    status: 'Accepted'
+  });
 }
 
 function handleRateTrader(req, res) {
@@ -610,16 +734,19 @@ function handleRateTrader(req, res) {
     return sendJson(res, false, 'Unauthorized to rate this swap.', {}, 403);
   }
 
-  // SQLite upsert
+  const tags = Array.isArray(req.body.tags) ? req.body.tags.join(', ') : (req.body.tags || '').trim();
+
+  // SQLite upsert with attributes tags
   db.prepare(`
-    INSERT INTO trader_reviews (offer_id, reviewer_id, target_user_id, rating, comment)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO trader_reviews (offer_id, reviewer_id, target_user_id, rating, comment, tags)
+    VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(offer_id, reviewer_id) DO UPDATE SET
       rating = excluded.rating,
-      comment = excluded.comment
-  `).run(offerId, reviewerId, targetId, rating, comment);
+      comment = excluded.comment,
+      tags = excluded.tags
+  `).run(offerId, reviewerId, targetId, rating, comment, tags);
 
-  return sendJson(res, true, 'Trader rating submitted! Thank you.');
+  return sendJson(res, true, 'Trader rating & review tags submitted! Thank you.');
 }
 
 // Router for /api/offers.php
@@ -628,15 +755,23 @@ app.all('/api/offers.php', (req, res) => {
   if (req.method === 'POST' && action === 'create') return handleCreateOffer(req, res);
   if (req.method === 'GET' && action === 'incoming') return handleIncomingOffers(req, res);
   if (req.method === 'POST' && action === 'respond') return handleRespondOffer(req, res);
+  if (req.method === 'POST' && action === 'fund_escrow') return handleFundEscrow(req, res);
+  if (req.method === 'POST' && action === 'verify_otp') return handleVerifyHandoverOtp(req, res);
+  if (req.method === 'POST' && action === 'redeem_pawn') return handleRedeemPawn(req, res);
+  if (req.method === 'POST' && action === 'liquidate_pawn') return handleLiquidatePawn(req, res);
   if (req.method === 'POST' && action === 'rate') return handleRateTrader(req, res);
   return sendJson(res, false, 'Invalid offers endpoint request.', {}, 400);
 });
 
-// RESTful aliases for offers
+// RESTful aliases for offers & pawn
 app.post('/api/offers', handleCreateOffer);
 app.get('/api/offers/incoming', handleIncomingOffers);
 app.post('/api/offers/respond', handleRespondOffer);
+app.post('/api/offers/fund-escrow', handleFundEscrow);
+app.post('/api/offers/verify-otp', handleVerifyHandoverOtp);
 app.post('/api/offers/rate', handleRateTrader);
+app.post('/api/pawn/redeem', handleRedeemPawn);
+app.post('/api/pawn/liquidate', handleLiquidatePawn);
 
 // ==========================================
 // TRADER STOREFRONT API
@@ -753,5 +888,158 @@ app.post('/api/admin/action', (req, res) => {
 
   return sendJson(res, false, 'Invalid admin action.', {}, 400);
 });
+
+// ==========================================
+// IN-APP MESSAGES & DIRECT INQUIRIES API
+// ==========================================
+
+function handleSendMessage(req, res) {
+  const senderId = requireAuth(req, res);
+  if (!senderId) return;
+
+  const itemId = parseInt(req.body.item_id || '0', 10);
+  const messageText = (req.body.message || '').trim();
+
+  if (!itemId || !messageText) {
+    return sendJson(res, false, 'Item reference and message text are required.', {}, 400);
+  }
+
+  const item = db.prepare('SELECT id, user_id, title FROM items WHERE id = ?').get(itemId);
+  if (!item) {
+    return sendJson(res, false, 'Listing not found.', {}, 404);
+  }
+
+  // Recipient is the owner if current user is inquirer, or specified user if owner is replying
+  let recipientId = parseInt(req.body.recipient_id || '0', 10);
+  if (!recipientId) {
+    recipientId = Number(item.user_id);
+  }
+
+  if (senderId === recipientId) {
+    return sendJson(res, false, 'You cannot send inquiries to your own listing.', {}, 400);
+  }
+
+  const insert = db.prepare(`
+    INSERT INTO messages (item_id, sender_id, recipient_id, message)
+    VALUES (?, ?, ?, ?)
+  `).run(itemId, senderId, recipientId, messageText);
+
+  return sendJson(res, true, 'Message sent successfully!', {
+    message_id: Number(insert.lastInsertRowid),
+    created_at: new Date().toISOString()
+  }, 201);
+}
+
+function handleGetThread(req, res) {
+  const currentUserId = requireAuth(req, res);
+  if (!currentUserId) return;
+
+  const itemId = parseInt(req.query.item_id || '0', 10);
+  const item = db.prepare(`
+    SELECT i.id, i.user_id, i.title, i.category, i.mode, i.item_condition, i.location,
+           i.wanted, i.est_value, i.image_path, u.full_name AS owner_name, u.phone AS owner_phone
+    FROM items i
+    JOIN users u ON i.user_id = u.id
+    WHERE i.id = ?
+  `).get(itemId);
+
+  if (!item) {
+    return sendJson(res, false, 'Item not found.', {}, 404);
+  }
+
+  let otherUserId = parseInt(req.query.other_user_id || '0', 10);
+  if (!otherUserId) {
+    otherUserId = (currentUserId === Number(item.user_id)) ? 0 : Number(item.user_id);
+  }
+
+  // Fetch all messages for this item between current user and other user
+  const messages = db.prepare(`
+    SELECT m.*, u.full_name AS sender_name
+    FROM messages m
+    JOIN users u ON m.sender_id = u.id
+    WHERE m.item_id = ?
+      AND ((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?))
+    ORDER BY m.created_at ASC
+  `).all(itemId, currentUserId, otherUserId, otherUserId, currentUserId);
+
+  // Mark messages sent to current user as read
+  db.prepare(`
+    UPDATE messages SET is_read = 1
+    WHERE item_id = ? AND recipient_id = ? AND sender_id = ? AND is_read = 0
+  `).run(itemId, currentUserId, otherUserId);
+
+  const otherUser = otherUserId ? db.prepare(`
+    SELECT u.id, u.full_name, u.location,
+           COALESCE(ROUND((SELECT AVG(rating) FROM trader_reviews WHERE target_user_id = u.id), 1), 5.0) AS rating,
+           (SELECT COUNT(*) FROM trader_reviews WHERE target_user_id = u.id) AS review_count
+    FROM users u WHERE u.id = ?
+  `).get(otherUserId) : null;
+
+  return sendJson(res, true, 'Message thread loaded.', {
+    item,
+    otherUser,
+    messages
+  });
+}
+
+function handleGetConversations(req, res) {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const sql = `
+    SELECT 
+      m.item_id,
+      CASE WHEN m.sender_id = ? THEN m.recipient_id ELSE m.sender_id END AS partner_id,
+      u.full_name AS partner_name,
+      i.title AS item_title,
+      i.image_path AS item_image,
+      i.mode AS item_mode,
+      m.message AS last_message,
+      m.created_at AS last_message_at,
+      (SELECT COUNT(*) FROM messages m2 
+       WHERE m2.item_id = m.item_id 
+         AND m2.recipient_id = ? 
+         AND m2.sender_id = (CASE WHEN m.sender_id = ? THEN m.recipient_id ELSE m.sender_id END) 
+         AND m2.is_read = 0) AS unread_count
+    FROM messages m
+    JOIN items i ON m.item_id = i.id
+    JOIN users u ON u.id = (CASE WHEN m.sender_id = ? THEN m.recipient_id ELSE m.sender_id END)
+    WHERE m.id IN (
+      SELECT MAX(id) FROM messages
+      WHERE sender_id = ? OR recipient_id = ?
+      GROUP BY item_id, CASE WHEN sender_id = ? THEN recipient_id ELSE sender_id END
+    )
+    ORDER BY m.created_at DESC
+  `;
+
+  const convos = db.prepare(sql).all(userId, userId, userId, userId, userId, userId, userId);
+  return sendJson(res, true, 'Conversations loaded.', { conversations: convos });
+}
+
+function handleUnreadCount(req, res) {
+  if (!req.session || !req.session.userId) {
+    return sendJson(res, true, 'Unread count', { count: 0 });
+  }
+
+  const userId = Number(req.session.userId);
+  const row = db.prepare('SELECT COUNT(*) as count FROM messages WHERE recipient_id = ? AND is_read = 0').get(userId);
+  return sendJson(res, true, 'Unread count', { count: row ? row.count : 0 });
+}
+
+// Router for /api/messages.php
+app.all('/api/messages.php', (req, res) => {
+  const action = req.query.action || '';
+  if (req.method === 'POST' && action === 'send') return handleSendMessage(req, res);
+  if (req.method === 'GET' && action === 'thread') return handleGetThread(req, res);
+  if (req.method === 'GET' && action === 'conversations') return handleGetConversations(req, res);
+  if (req.method === 'GET' && action === 'unread_count') return handleUnreadCount(req, res);
+  return sendJson(res, false, 'Invalid messages endpoint request.', {}, 400);
+});
+
+// RESTful aliases for messages
+app.post('/api/messages/send', handleSendMessage);
+app.get('/api/messages/thread', handleGetThread);
+app.get('/api/messages/conversations', handleGetConversations);
+app.get('/api/messages/unread-count', handleUnreadCount);
 
 module.exports = app;

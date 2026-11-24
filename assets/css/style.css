@@ -1020,3 +1020,187 @@ body {
 [data-theme="dark"] .navbar-brand {
   color: #ffffff !important;
 }
+
+/* =========================================================
+   IN-APP MESSAGES DRAWER & CONVERSATION UI
+   ========================================================= */
+
+.chat-drawer-container {
+  width: 420px;
+  max-width: 95vw;
+}
+
+.chat-thread-box {
+  height: 380px;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background-color: var(--dfq-surface-alt, #f8fafc);
+  border-radius: 12px;
+}
+
+.message-bubble {
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.message-bubble.incoming {
+  align-self: flex-start;
+  background-color: var(--dfq-surface, #ffffff);
+  color: var(--dfq-text, #1e293b);
+  border: 1px solid var(--border-soft, #e2e8f0);
+  border-bottom-left-radius: 4px;
+}
+
+.message-bubble.outgoing {
+  align-self: flex-end;
+  background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%);
+  color: #ffffff;
+  border-bottom-right-radius: 4px;
+}
+
+.message-time {
+  font-size: 0.68rem;
+  opacity: 0.75;
+  margin-top: 4px;
+  text-align: right;
+}
+
+.quick-chip {
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.quick-chip:hover {
+  background-color: #e0f2fe;
+  border-color: #38bdf8;
+  color: #0284c7;
+  transform: translateY(-1px);
+}
+
+[data-theme="dark"] .quick-chip {
+  background-color: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .quick-chip:hover {
+  background-color: #0f172a;
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+/* =========================================================
+   3-STEP GUIDED LISTING WIZARD
+   ========================================================= */
+
+.wizard-steps-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.wizard-steps-header::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  left: 30px;
+  right: 30px;
+  height: 2px;
+  background-color: #e2e8f0;
+  z-index: 1;
+}
+
+[data-theme="dark"] .wizard-steps-header::before {
+  background-color: #334155;
+}
+
+.wizard-step-node {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  cursor: pointer;
+  flex: 1;
+}
+
+.wizard-step-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #f1f5f9;
+  border: 2px solid #cbd5e1;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.88rem;
+  transition: all 0.25s ease;
+}
+
+.wizard-step-node.active .wizard-step-circle {
+  background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%);
+  border-color: #0284c7;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.2);
+}
+
+.wizard-step-node.completed .wizard-step-circle {
+  background-color: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+}
+
+.wizard-step-title {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 600;
+  margin-top: 6px;
+  color: #64748b;
+}
+
+.wizard-step-node.active .wizard-step-title {
+  color: #0284c7;
+  font-weight: 700;
+}
+
+[data-theme="dark"] .wizard-step-node.active .wizard-step-title {
+  color: #38bdf8;
+}
+
+/* =========================================================
+   DUAL-OTP ESCROW VERIFICATION BOX
+   ========================================================= */
+
+.otp-digit-box {
+  width: 48px;
+  height: 56px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  text-align: center;
+  border-radius: 10px;
+  border: 2px solid #cbd5e1;
+  background-color: var(--dfq-surface, #ffffff);
+  color: var(--dfq-text, #0f172a);
+}
+
+.otp-digit-box:focus {
+  border-color: #0ea5e9;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+}

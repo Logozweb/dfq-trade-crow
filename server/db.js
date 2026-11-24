@@ -94,7 +94,41 @@ function initSchema() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id INTEGER NOT NULL,
+      sender_id INTEGER NOT NULL,
+      recipient_id INTEGER NOT NULL,
+      message TEXT NOT NULL,
+      is_read INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+      FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
+    );
   `);
+
+  // Safely ensure dual-OTP & escrow columns exist on swap_offers
+  try { db.exec(`ALTER TABLE swap_offers ADD COLUMN proposer_otp TEXT;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE swap_offers ADD COLUMN owner_otp TEXT;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE swap_offers ADD COLUMN proposer_confirmed INTEGER DEFAULT 0;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE swap_offers ADD COLUMN owner_confirmed INTEGER DEFAULT 0;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE swap_offers ADD COLUMN meetup_hub TEXT DEFAULT 'Ikeja City Mall Public Hub';`); } catch (_) {}
+  try { db.exec(`ALTER TABLE swap_offers ADD COLUMN escrow_funded INTEGER DEFAULT 0;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE swap_offers ADD COLUMN offered_image TEXT;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE swap_offers ADD COLUMN decline_reason TEXT;`); } catch (_) {}
+
+  // Safely ensure tiered KYC columns exist on users
+  try { db.exec(`ALTER TABLE users ADD COLUMN kyc_tier INTEGER DEFAULT 1;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN nin_bvn TEXT;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN business_name TEXT;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN business_address TEXT;`); } catch (_) {}
+
+  // Safely ensure pawn lifecycle & review tag columns exist
+  try { db.exec(`ALTER TABLE items ADD COLUMN is_liquidated INTEGER DEFAULT 0;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE items ADD COLUMN redeemed_at DATETIME;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE trader_reviews ADD COLUMN tags TEXT;`); } catch (_) {}
 
   // Seed demo user if not exists
   const userCheck = db.prepare('SELECT id FROM users WHERE email = ?').get('demo@dfqtradecrow.com');
