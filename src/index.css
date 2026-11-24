@@ -96,6 +96,18 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--dfq-text);
 }
 
+/* Global Navigation Strict Rules */
+nav,
+nav * {
+  white-space: nowrap !important;
+}
+
+nav button,
+nav a,
+nav span {
+  flex-shrink: 0;
+}
+
 /* Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;

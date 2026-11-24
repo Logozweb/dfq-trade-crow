@@ -30,7 +30,8 @@ import {
   Gift,
   Bell,
   LayoutGrid,
-  ShieldAlert
+  ShieldAlert,
+  Menu
 } from 'lucide-react';
 
 import ItemDetailModal from './components/ItemDetailModal';
@@ -88,6 +89,7 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(null); // 'login' | 'register' | null
   const [referralBanner, setReferralBanner] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [kycAlertModal, setKycAlertModal] = useState(false);
 
   // Apply Theme
@@ -272,83 +274,78 @@ export default function App() {
       {/* =========================================================================
           1. CLEAN IMPROVED HEADER (Requirement 1, 7, 9)
           ========================================================================= */}
-      <nav className="sticky top-0 z-40 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md transition-colors h-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-full flex items-center justify-between gap-3">
+      <nav className="sticky top-0 z-40 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md transition-colors h-16 select-none">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-full flex items-center justify-between gap-2 sm:gap-4 flex-nowrap overflow-x-hidden">
           {/* Brand Logo */}
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-nowrap">
             <button
               onClick={() => {
                 setActiveView('marketplace');
                 window.history.pushState({}, '', '/');
               }}
-              className="flex items-center gap-2.5 bg-transparent border-0 text-left cursor-pointer p-0 group shrink-0"
+              className="flex items-center gap-2.5 bg-transparent border-0 text-left cursor-pointer p-0 group shrink-0 flex-nowrap"
             >
               <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white shadow-sm shadow-sky-500/25 group-hover:scale-105 transition-transform shrink-0">
-                <ArrowLeftRight className="w-4 h-4" />
+                <ArrowLeftRight className="w-4 h-4 shrink-0" />
               </div>
-              <div className="flex items-center gap-1.5 whitespace-nowrap">
-                <span className="font-extrabold text-[15px] sm:text-base tracking-tight text-slate-900 dark:text-white">DFQ</span>
-                <span className="font-extrabold text-[15px] sm:text-base tracking-tight text-sky-600 dark:text-sky-400">Trade Crow</span>
-              </div>
+              <span className="font-extrabold text-[15px] sm:text-base tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0">
+                DFQ <span className="text-sky-600 dark:text-sky-400">Trade Crow</span>
+              </span>
             </button>
-            <span className="hidden xl:inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 whitespace-nowrap shrink-0">
-              <ShieldCheck className="w-3 h-3 text-sky-500" />
-              <span>Verified P2P</span>
-            </span>
           </div>
 
           {/* Center Nav Links (Clean Consumer Navigation) */}
-          <div className="hidden lg:flex items-center gap-1 shrink-0">
+          <div className="hidden lg:flex items-center gap-1 xl:gap-1.5 shrink-0 flex-nowrap">
             <button
               onClick={() => {
                 setActiveView('marketplace');
                 window.history.pushState({}, '', '/');
               }}
-              className={`px-3 py-1.5 rounded-lg text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all ${
+              className={`px-2.5 xl:px-3 py-1.5 rounded-lg text-xs xl:text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all ${
                 activeView === 'marketplace'
                   ? 'bg-sky-50 text-sky-700 border border-sky-200/80 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/80 shadow-xs'
                   : 'bg-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/50'
               }`}
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Marketplace</span>
+              <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
+              <span className="whitespace-nowrap">Marketplace</span>
             </button>
 
             <button
               onClick={() => setActiveView('tradedesk')}
-              className={`px-3 py-1.5 rounded-lg text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all ${
+              className={`px-2.5 xl:px-3 py-1.5 rounded-lg text-xs xl:text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all ${
                 activeView === 'tradedesk'
                   ? 'bg-sky-50 text-sky-700 border border-sky-200/80 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/80 shadow-xs'
                   : 'bg-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/50'
               }`}
             >
-              <Kanban className="w-3.5 h-3.5" />
-              <span>Trade Desk</span>
+              <Kanban className="w-3.5 h-3.5 shrink-0" />
+              <span className="whitespace-nowrap">Trade Desk</span>
             </button>
 
             <button
               onClick={() => setShowSerialModal(true)}
-              className="px-3 py-1.5 rounded-lg text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-all bg-transparent"
+              className="px-2.5 xl:px-3 py-1.5 rounded-lg text-xs xl:text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-all bg-transparent"
             >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>Verify IMEI</span>
+              <QrCode className="w-3.5 h-3.5 shrink-0" />
+              <span className="whitespace-nowrap">Verify IMEI</span>
             </button>
 
             <button
               onClick={() => setActiveView('trust')}
-              className={`px-3 py-1.5 rounded-lg text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all ${
+              className={`px-2.5 xl:px-3 py-1.5 rounded-lg text-xs xl:text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all ${
                 activeView === 'trust'
                   ? 'bg-sky-50 text-sky-700 border border-sky-200/80 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/80 shadow-xs'
                   : 'bg-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/50'
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Trust &amp; Escrow</span>
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+              <span className="whitespace-nowrap">Trust &amp; Escrow</span>
             </button>
           </div>
 
           {/* Right Action Cluster */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-nowrap">
             {/* Dedicated Admin Portal Link (Only for admins) */}
             {user?.is_admin === 1 && (
               <button
@@ -363,8 +360,8 @@ export default function App() {
                 }`}
                 title="Management Console"
               >
-                <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
-                <span>Admin Console</span>
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span className="whitespace-nowrap">Admin Portal</span>
               </button>
             )}
 
@@ -372,10 +369,10 @@ export default function App() {
             {user && (
               <button
                 onClick={() => setShowNotificationCenter(true)}
-                className="relative p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border-0 bg-transparent cursor-pointer transition-colors shrink-0"
+                className="relative p-1.5 sm:p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border-0 bg-transparent cursor-pointer transition-colors shrink-0"
                 title="Notifications"
               >
-                <Bell className="w-4 h-4" />
+                <Bell className="w-4 h-4 shrink-0" />
                 {unreadNotifsCount > 0 && (
                   <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
                     {unreadNotifsCount}
@@ -393,10 +390,10 @@ export default function App() {
                   setShowAuthModal('login');
                 }
               }}
-              className="relative p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border-0 bg-transparent cursor-pointer transition-colors shrink-0"
+              className="relative p-1.5 sm:p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border-0 bg-transparent cursor-pointer transition-colors shrink-0"
               title="Real-time Chat"
             >
-              <MessageSquare className="w-4 h-4" />
+              <MessageSquare className="w-4 h-4 shrink-0" />
               {unreadMessagesCount > 0 && (
                 <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-sky-500 text-white text-[9px] font-bold flex items-center justify-center">
                   {unreadMessagesCount}
@@ -404,11 +401,11 @@ export default function App() {
               )}
             </button>
 
-            {/* KYC Status Pill (Only for regular non-admin logged-in users) */}
+            {/* KYC Status Pill (Only for regular non-admin logged-in users, on xl+ screens) */}
             {user && user.is_admin !== 1 && (
               <button
                 onClick={() => setShowKycModal(true)}
-                className={`hidden md:inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border cursor-pointer whitespace-nowrap shrink-0 transition-all ${
+                className={`hidden xl:inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border cursor-pointer whitespace-nowrap shrink-0 transition-all ${
                   user.kyc_status === 'approved'
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800'
                     : user.kyc_status === 'pending_review'
@@ -418,13 +415,13 @@ export default function App() {
                 title={user.kyc_status === 'approved' ? 'Verified Trader' : user.kyc_status === 'pending_review' ? 'KYC Under Review' : 'Verify Identity'}
               >
                 {user.kyc_status === 'approved' ? (
-                  <BadgeCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <BadgeCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 ) : user.kyc_status === 'pending_review' ? (
-                  <Clock className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                  <Clock className="w-3.5 h-3.5 text-amber-600 animate-spin shrink-0" />
                 ) : (
-                  <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 )}
-                <span>
+                <span className="whitespace-nowrap">
                   {user.kyc_status === 'approved'
                     ? (user.kyc_tier === 3 ? 'Gold Seal Pro' : 'Verified Trader')
                     : user.kyc_status === 'pending_review'
@@ -437,16 +434,16 @@ export default function App() {
             {/* + Post Listing CTA */}
             <button
               onClick={handleOpenPostListing}
-              className="inline-flex items-center gap-1.5 text-xs sm:text-[13px] font-semibold px-3 sm:px-3.5 py-1.5 rounded-lg border-0 cursor-pointer text-white shadow-sm bg-sky-600 hover:bg-sky-500 active:bg-sky-700 transition-all shadow-sky-600/20 whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1.5 text-xs sm:text-[13px] font-semibold px-2.5 sm:px-3.5 py-1.5 rounded-lg border-0 cursor-pointer text-white shadow-sm bg-sky-600 hover:bg-sky-500 active:bg-sky-700 transition-all shadow-sky-600/20 whitespace-nowrap shrink-0"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Post Listing</span>
+              <Plus className="w-3.5 h-3.5 shrink-0" />
+              <span className="whitespace-nowrap">Post Listing</span>
             </button>
 
             {/* Auth Buttons / User Profile */}
             {user ? (
-              <div className="flex items-center gap-1.5 pl-1 shrink-0">
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 whitespace-nowrap">
+              <div className="flex items-center gap-1 sm:gap-1.5 pl-0.5 sm:pl-1 shrink-0 whitespace-nowrap flex-nowrap">
+                <span className="text-xs font-semibold px-2 sm:px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 whitespace-nowrap shrink-0">
                   {user.full_name?.split(' ')[0]}
                 </span>
                 <button
@@ -461,20 +458,20 @@ export default function App() {
                   title="Log out"
                   className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent cursor-pointer hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 transition-all text-slate-500 shrink-0"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <LogOut className="w-3.5 h-3.5 shrink-0" />
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-1 shrink-0 whitespace-nowrap flex-nowrap">
                 <button
                   onClick={() => setShowAuthModal('login')}
-                  className="text-xs sm:text-[13px] font-medium px-2.5 sm:px-3 py-1.5 rounded-lg border-0 bg-transparent text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors whitespace-nowrap"
+                  className="text-xs sm:text-[13px] font-medium px-2 sm:px-3 py-1.5 rounded-lg border-0 bg-transparent text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors whitespace-nowrap shrink-0"
                 >
                   Log In
                 </button>
                 <button
                   onClick={() => setShowAuthModal('register')}
-                  className="text-xs sm:text-[13px] font-medium px-3 py-1.5 rounded-lg border border-sky-300 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 cursor-pointer transition-colors whitespace-nowrap"
+                  className="text-xs sm:text-[13px] font-medium px-2.5 sm:px-3 py-1.5 rounded-lg border border-sky-300 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 cursor-pointer transition-colors whitespace-nowrap shrink-0"
                 >
                   Sign Up
                 </button>
@@ -487,11 +484,94 @@ export default function App() {
               className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer transition-colors shrink-0"
               title="Toggle Dark / Light Theme"
             >
-              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400 shrink-0" /> : <Moon className="w-4 h-4 shrink-0" />}
+            </button>
+
+            {/* Mobile / Tablet Hamburger Toggle */}
+            <button
+              onClick={() => setMobileMenuOpen(prev => !prev)}
+              className="lg:hidden p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 bg-transparent cursor-pointer shrink-0 transition-colors"
+              title="Toggle Menu"
+            >
+              {mobileMenuOpen ? <X className="w-4 h-4 shrink-0" /> : <Menu className="w-4 h-4 shrink-0" />}
             </button>
           </div>
         </div>
       </nav>
+
+      {/* Mobile Drawer Navigation */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 py-3 space-y-2 animate-in slide-in-from-top-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => {
+                setActiveView('marketplace');
+                setMobileMenuOpen(false);
+                window.history.pushState({}, '', '/');
+              }}
+              className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 border cursor-pointer ${
+                activeView === 'marketplace'
+                  ? 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800'
+                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4 text-sky-600" />
+              <span>Marketplace</span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveView('tradedesk');
+                setMobileMenuOpen(false);
+              }}
+              className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 border cursor-pointer ${
+                activeView === 'tradedesk'
+                  ? 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800'
+                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              <Kanban className="w-4 h-4 text-sky-600" />
+              <span>Trade Desk</span>
+            </button>
+            <button
+              onClick={() => {
+                setShowSerialModal(true);
+                setMobileMenuOpen(false);
+              }}
+              className="p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
+            >
+              <QrCode className="w-4 h-4 text-sky-600" />
+              <span>Verify IMEI</span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveView('trust');
+                setMobileMenuOpen(false);
+              }}
+              className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 border cursor-pointer ${
+                activeView === 'trust'
+                  ? 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800'
+                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4 text-sky-600" />
+              <span>Trust &amp; Escrow</span>
+            </button>
+          </div>
+          {user?.is_admin === 1 && (
+            <button
+              onClick={() => {
+                setActiveView('admin');
+                setMobileMenuOpen(false);
+                window.history.pushState({}, '', '/admin');
+              }}
+              className="w-full p-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border border-amber-300 bg-amber-50 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200 cursor-pointer"
+            >
+              <ShieldAlert className="w-4 h-4 text-amber-600" />
+              <span>Open Admin Operations &amp; Dispatcher Hub</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* =========================================================================
           VIEW SWITCHER
