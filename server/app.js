@@ -55,8 +55,8 @@ const upload = multer({
 
 // Middleware
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());
 app.use(session({
   secret: 'dfq-trade-crow-secret-key-2026',
@@ -357,12 +357,22 @@ function handleKycSubmit(req, res) {
   if (req.file) {
     docPath = 'uploads/' + req.file.filename;
   } else if (req.body.id_document_data) {
-    const matches = req.body.id_document_data.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
+    const matches = req.body.id_document_data.match(/^data:([a-zA-Z0-9/+-]+);base64,(.+)$/);
     if (matches) {
-      const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
-      const filename = `kyc_${userId}_${crypto.randomBytes(6).toString('hex')}.${ext}`;
-      fs.writeFileSync(path.join(UPLOAD_DIR, filename), Buffer.from(matches[2], 'base64'));
-      docPath = 'uploads/' + filename;
+      const mime = (matches[1] || '').toLowerCase();
+      let ext = 'jpg';
+      if (mime.includes('png')) ext = 'png';
+      else if (mime.includes('pdf')) ext = 'pdf';
+      else if (mime.includes('webp')) ext = 'webp';
+      else if (mime.includes('gif')) ext = 'gif';
+      else if (mime.includes('jpeg')) ext = 'jpg';
+      const filename = `kyc_${userId}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
+      try {
+        fs.writeFileSync(path.join(UPLOAD_DIR, filename), Buffer.from(matches[2], 'base64'));
+        docPath = 'uploads/' + filename;
+      } catch (fErr) {
+        console.error('[KYC Upload Error]', fErr);
+      }
     }
   }
 

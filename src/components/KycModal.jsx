@@ -17,13 +17,47 @@ export default function KycModal({ user, onClose, onSuccess }) {
   const [submitted, setSubmitted] = useState(false);
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setIdFile(file);
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setIdFile(file);
+
+    if (file.type === 'application/pdf') {
       const reader = new FileReader();
       reader.onload = (ev) => setIdPreview(ev.target.result);
       reader.readAsDataURL(file);
+      return;
     }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIM = 1600;
+        let width = img.width;
+        let height = img.height;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL('image/jpeg', 0.85);
+        setIdPreview(compressed);
+      };
+      img.onerror = () => {
+        setIdPreview(ev.target.result);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e) => {
@@ -59,7 +93,12 @@ export default function KycModal({ user, onClose, onSuccess }) {
           cac_number: cacNumber
         })
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (_) {
+        throw new Error(`Server returned error status (${res.status}). Please check your connection or file size.`);
+      }
       setLoading(false);
 
       if (data.success) {
@@ -68,9 +107,9 @@ export default function KycModal({ user, onClose, onSuccess }) {
       } else {
         setError(data.message || 'Verification could not be submitted.');
       }
-    } catch (_) {
+    } catch (err) {
       setLoading(false);
-      setError('Connection error while submitting verification.');
+      setError(err.message || 'Connection error while submitting verification.');
     }
   };
 
@@ -271,7 +310,7 @@ export default function KycModal({ user, onClose, onSuccess }) {
                 <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-3 text-center bg-slate-50 dark:bg-slate-800/40 relative">
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,application/pdf"
                     onChange={handleFileChange}
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                   />
