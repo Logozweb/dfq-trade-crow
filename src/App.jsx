@@ -42,6 +42,7 @@ import TradeDeskView from './components/TradeDeskView';
 import StorefrontView from './components/StorefrontView';
 import TrustCenterView from './components/TrustCenterView';
 import AdminDashboardView from './components/AdminDashboardView';
+import AdminLoginView from './components/AdminLoginView';
 import AnimatedHeroSection from './components/AnimatedHeroSection';
 import NotificationCenterModal from './components/NotificationCenterModal';
 import RealtimeChatDrawer from './components/RealtimeChatDrawer';
@@ -112,6 +113,11 @@ export default function App() {
 
   useEffect(() => {
     refreshUser();
+    // Check if user navigated directly to /admin or /admin/login
+    const path = window.location.pathname.toLowerCase();
+    if (path === '/admin' || path === '/admin/login' || window.location.search.includes('view=admin')) {
+      setActiveView('admin');
+    }
   }, []);
 
   // Fetch Items
@@ -271,10 +277,13 @@ export default function App() {
           {/* Brand Logo */}
           <div className="flex items-center gap-3 shrink-0">
             <button
-              onClick={() => setActiveView('marketplace')}
-              className="flex items-center gap-2.5 bg-transparent border-0 text-left cursor-pointer p-0 group"
+              onClick={() => {
+                setActiveView('marketplace');
+                window.history.pushState({}, '', '/');
+              }}
+              className="flex items-center gap-2.5 bg-transparent border-0 text-left cursor-pointer p-0 group shrink-0"
             >
-              <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white shadow-sm shadow-sky-500/25 group-hover:scale-105 transition-transform">
+              <div className="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white shadow-sm shadow-sky-500/25 group-hover:scale-105 transition-transform shrink-0">
                 <ArrowLeftRight className="w-4 h-4" />
               </div>
               <div className="flex items-center gap-1.5 whitespace-nowrap">
@@ -282,17 +291,20 @@ export default function App() {
                 <span className="font-extrabold text-[15px] sm:text-base tracking-tight text-sky-600 dark:text-sky-400">Trade Crow</span>
               </div>
             </button>
-            <span className="hidden xl:inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300">
+            <span className="hidden xl:inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 whitespace-nowrap shrink-0">
               <ShieldCheck className="w-3 h-3 text-sky-500" />
               <span>Verified P2P</span>
             </span>
           </div>
 
-          {/* Center Nav Links */}
-          <div className="hidden lg:flex items-center gap-1">
+          {/* Center Nav Links (Clean Consumer Navigation) */}
+          <div className="hidden lg:flex items-center gap-1 shrink-0">
             <button
-              onClick={() => setActiveView('marketplace')}
-              className={`px-3 py-1.5 rounded-lg text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 transition-all ${
+              onClick={() => {
+                setActiveView('marketplace');
+                window.history.pushState({}, '', '/');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all ${
                 activeView === 'marketplace'
                   ? 'bg-sky-50 text-sky-700 border border-sky-200/80 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/80 shadow-xs'
                   : 'bg-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/50'
@@ -304,7 +316,7 @@ export default function App() {
 
             <button
               onClick={() => setActiveView('tradedesk')}
-              className={`px-3 py-1.5 rounded-lg text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all ${
                 activeView === 'tradedesk'
                   ? 'bg-sky-50 text-sky-700 border border-sky-200/80 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/80 shadow-xs'
                   : 'bg-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/50'
@@ -316,7 +328,7 @@ export default function App() {
 
             <button
               onClick={() => setShowSerialModal(true)}
-              className="px-3 py-1.5 rounded-lg text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-all bg-transparent"
+              className="px-3 py-1.5 rounded-lg text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-all bg-transparent"
             >
               <QrCode className="w-3.5 h-3.5" />
               <span>Verify IMEI</span>
@@ -324,7 +336,7 @@ export default function App() {
 
             <button
               onClick={() => setActiveView('trust')}
-              className={`px-3 py-1.5 rounded-lg text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all ${
                 activeView === 'trust'
                   ? 'bg-sky-50 text-sky-700 border border-sky-200/80 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/80 shadow-xs'
                   : 'bg-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/50'
@@ -333,30 +345,34 @@ export default function App() {
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Trust &amp; Escrow</span>
             </button>
-
-            {/* Admin Console Pill */}
-            {user?.is_admin === 1 && (
-              <button
-                onClick={() => setActiveView('admin')}
-                className={`px-3 py-1.5 rounded-lg text-[13px] font-medium border-0 cursor-pointer flex items-center gap-1.5 transition-all ${
-                  activeView === 'admin'
-                    ? 'bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800 shadow-xs'
-                    : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100/80'
-                }`}
-              >
-                <ShieldAlert className="w-3.5 h-3.5" />
-                <span>Admin Console</span>
-              </button>
-            )}
           </div>
 
           {/* Right Action Cluster */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Dedicated Admin Portal Link (Only for admins) */}
+            {user?.is_admin === 1 && (
+              <button
+                onClick={() => {
+                  setActiveView('admin');
+                  window.history.pushState({}, '', '/admin');
+                }}
+                className={`hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border cursor-pointer whitespace-nowrap shrink-0 transition-all ${
+                  activeView === 'admin'
+                    ? 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200'
+                    : 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/80 hover:bg-amber-100/80'
+                }`}
+                title="Management Console"
+              >
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+                <span>Admin Console</span>
+              </button>
+            )}
+
             {/* Notification Bell (Requirement 7) */}
             {user && (
               <button
                 onClick={() => setShowNotificationCenter(true)}
-                className="relative p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border-0 bg-transparent cursor-pointer transition-colors"
+                className="relative p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border-0 bg-transparent cursor-pointer transition-colors shrink-0"
                 title="Notifications"
               >
                 <Bell className="w-4 h-4" />
@@ -377,7 +393,7 @@ export default function App() {
                   setShowAuthModal('login');
                 }
               }}
-              className="relative p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border-0 bg-transparent cursor-pointer transition-colors"
+              className="relative p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border-0 bg-transparent cursor-pointer transition-colors shrink-0"
               title="Real-time Chat"
             >
               <MessageSquare className="w-4 h-4" />
@@ -388,12 +404,12 @@ export default function App() {
               )}
             </button>
 
-            {/* KYC Status Pill (Only for logged-in users) */}
-            {user && (
+            {/* KYC Status Pill (Only for regular non-admin logged-in users) */}
+            {user && user.is_admin !== 1 && (
               <button
                 onClick={() => setShowKycModal(true)}
-                className={`hidden md:inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border cursor-pointer transition-all ${
-                  user.is_admin === 1 || user.kyc_status === 'approved'
+                className={`hidden md:inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border cursor-pointer whitespace-nowrap shrink-0 transition-all ${
+                  user.kyc_status === 'approved'
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800'
                     : user.kyc_status === 'pending_review'
                     ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800'
@@ -401,7 +417,7 @@ export default function App() {
                 }`}
                 title={user.kyc_status === 'approved' ? 'Verified Trader' : user.kyc_status === 'pending_review' ? 'KYC Under Review' : 'Verify Identity'}
               >
-                {user.kyc_status === 'approved' || user.is_admin === 1 ? (
+                {user.kyc_status === 'approved' ? (
                   <BadgeCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 ) : user.kyc_status === 'pending_review' ? (
                   <Clock className="w-3.5 h-3.5 text-amber-600 animate-spin" />
@@ -409,9 +425,7 @@ export default function App() {
                   <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
                 )}
                 <span>
-                  {user.is_admin === 1
-                    ? 'Admin Verified'
-                    : user.kyc_status === 'approved'
+                  {user.kyc_status === 'approved'
                     ? (user.kyc_tier === 3 ? 'Gold Seal Pro' : 'Verified Trader')
                     : user.kyc_status === 'pending_review'
                     ? 'KYC Pending'
@@ -420,10 +434,10 @@ export default function App() {
               </button>
             )}
 
-            {/* + Post Listing CTA (Requirement 3, 9) */}
+            {/* + Post Listing CTA */}
             <button
               onClick={handleOpenPostListing}
-              className="inline-flex items-center gap-1.5 text-xs sm:text-[13px] font-semibold px-3 sm:px-3.5 py-1.5 rounded-lg border-0 cursor-pointer text-white shadow-sm bg-sky-600 hover:bg-sky-500 active:bg-sky-700 transition-all shadow-sky-600/20"
+              className="inline-flex items-center gap-1.5 text-xs sm:text-[13px] font-semibold px-3 sm:px-3.5 py-1.5 rounded-lg border-0 cursor-pointer text-white shadow-sm bg-sky-600 hover:bg-sky-500 active:bg-sky-700 transition-all shadow-sky-600/20 whitespace-nowrap shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Post Listing</span>
@@ -431,8 +445,8 @@ export default function App() {
 
             {/* Auth Buttons / User Profile */}
             {user ? (
-              <div className="flex items-center gap-1.5 pl-1">
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
+              <div className="flex items-center gap-1.5 pl-1 shrink-0">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 whitespace-nowrap">
                   {user.full_name?.split(' ')[0]}
                 </span>
                 <button
@@ -440,25 +454,27 @@ export default function App() {
                     fetch('/api/auth/logout').then(() => {
                       setUser(null);
                       setToastMessage('Logged out successfully.');
+                      window.history.pushState({}, '', '/');
+                      setActiveView('marketplace');
                     });
                   }}
                   title="Log out"
-                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent cursor-pointer hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 transition-all text-slate-500"
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent cursor-pointer hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 transition-all text-slate-500 shrink-0"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={() => setShowAuthModal('login')}
-                  className="text-xs sm:text-[13px] font-medium px-2.5 sm:px-3 py-1.5 rounded-lg border-0 bg-transparent text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                  className="text-xs sm:text-[13px] font-medium px-2.5 sm:px-3 py-1.5 rounded-lg border-0 bg-transparent text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors whitespace-nowrap"
                 >
                   Log In
                 </button>
                 <button
                   onClick={() => setShowAuthModal('register')}
-                  className="text-xs sm:text-[13px] font-medium px-3 py-1.5 rounded-lg border border-sky-300 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 cursor-pointer transition-colors"
+                  className="text-xs sm:text-[13px] font-medium px-3 py-1.5 rounded-lg border border-sky-300 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 cursor-pointer transition-colors whitespace-nowrap"
                 >
                   Sign Up
                 </button>
@@ -468,7 +484,7 @@ export default function App() {
             {/* Theme Toggle */}
             <button
               onClick={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer transition-colors"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer transition-colors shrink-0"
               title="Toggle Dark / Light Theme"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
@@ -481,7 +497,24 @@ export default function App() {
           VIEW SWITCHER
           ========================================================================= */}
       {activeView === 'admin' && (
-        <AdminDashboardView onBackToMarketplace={() => setActiveView('marketplace')} />
+        user?.is_admin === 1 ? (
+          <AdminDashboardView onBackToMarketplace={() => {
+            setActiveView('marketplace');
+            window.history.pushState({}, '', '/');
+          }} />
+        ) : (
+          <AdminLoginView
+            onAdminAuthenticated={(adminUser) => {
+              setUser(adminUser);
+              setActiveView('admin');
+              window.history.pushState({}, '', '/admin');
+            }}
+            onBackToMarketplace={() => {
+              setActiveView('marketplace');
+              window.history.pushState({}, '', '/');
+            }}
+          />
+        )
       )}
 
       {activeView === 'tradedesk' && (

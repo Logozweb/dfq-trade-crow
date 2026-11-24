@@ -68,38 +68,61 @@ function buildStatusNotificationHtml(name, title, message, actionText, actionUrl
   `;
 }
 
+const db = require('./db');
+
 async function dispatchEmail({ to, recipientName = 'Trader', otpCode = '', subject, html, purpose = 'registration' }) {
   const cleanTo = (to || '').trim().toLowerCase();
   if (!cleanTo || !cleanTo.includes('@')) {
     return { success: false, error: 'Recipient email address is invalid.' };
   }
 
-  const mailSubject = subject || (otpCode ? `DFQ Trade Crow - Your Verification Code: ${otpCode}` : 'DFQ Trade Crow Notification');
+  // Load configured settings from database
+  let settings;
+  try {
+    settings = db.getEmailSettingsFromDb();
+  } catch (_) {
+    settings = { provider: 'smtp', smtp: {} };
+  }
+
+  const senderName = settings.senderName || 'DFQ Trade Crow Security';
+  const senderEmail = settings.senderEmail || (settings.smtp && settings.smtp.user) || 'no-reply@dfqtradecrow.com';
+  const mailSubject = subject || (otpCode ? `${settings.subjectLine || 'DFQ Trade Crow - Your Verification Code'}: ${otpCode}` : 'DFQ Trade Crow Notification');
   const mailHtml = html || buildOtpEmailHtml(recipientName, otpCode, purpose);
 
-  // Check if SMTP environment variables are present
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpPort = process.env.SMTP_PORT || 587;
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
+  // 1. SMTP Provider
+  const smtpHost = (settings.smtp && settings.smtp.host) || process.env.SMTP_HOST;
+  const smtpPort = (settings.smtp && settings.smtp.port) || process.env.SMTP_PORT || 587;
+  const smtpUser = (settings.smtp && settings.smtp.user) || process.env.SMTP_USER;
+  const smtpPass = (settings.smtp && settings.smtp.pass) || process.env.SMTP_PASS;
+  const smtpSecure = (settings.smtp && typeof settings.smtp.secure === 'boolean') ? settings.smtp.secure : Number(smtpPort) === 465;
 
-  if (smtpHost && smtpUser && smtpPass) {
+  if (settings.provider === 'smtp' && smtpHost && smtpUser && smtpPass) {
     try {
       const transporter = nodemailer.createTransport({
         host: smtpHost,
         port: Number(smtpPort),
-        secure: Number(smtpPort) === 465,
+        secure: smtpSecure,
         auth: {
           user: smtpUser,
           pass: smtpPass
         }
       });
 
-      await transporter.sendMail({
-        from: `"${process.env.SMTP_FROM_NAME || 'DFQ Trade Crow'}" <${smtpUser}>`,
+      const info = await transporter.sendMail({
+        from: `"${senderName}" <${smtpUser}>`,
         to: cleanTo,
         subject: mailSubject,
         html: mailHtml
+      });
+
+      db.saveEmailOutboxLog({
+        recipientEmail: cleanTo,
+        recipientName,
+        otpCode,
+        subject: mailSubject,
+        status: 'delivered',
+        provider: 'smtp',
+        details: `MessageId: ${info.messageId || 'OK'}`
       });
 
       return {
@@ -110,12 +133,80 @@ async function dispatchEmail({ to, recipientName = 'Trader', otpCode = '', subje
       };
     } catch (err) {
       console.error('[EmailDispatcher] SMTP dispatch error:', err.message);
-      // Fallback to local dev delivery
+      db.saveEmailOutboxLog({
+        recipientEmail: cleanTo,
+        recipientName,
+        otpCode,
+        subject: mailSubject,
+        status: 'failed',
+        provider: 'smtp',
+        details: err.message
+      });
+      // Fall through to dev delivery so user registration never locks up
     }
   }
 
-  // Development / Offline Fallback Mode
+  // 2. Resend API Provider
+  if (settings.provider === 'resend' && settings.resendApiKey) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${settings.resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: `${senderName} <${senderEmail}>`,
+          to: [cleanTo],
+          subject: mailSubject,
+          html: mailHtml
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        db.saveEmailOutboxLog({
+          recipientEmail: cleanTo,
+          recipientName,
+          otpCode,
+          subject: mailSubject,
+          status: 'delivered',
+          provider: 'resend',
+          details: `Resend ID: ${data.id}`
+        });
+        return {
+          success: true,
+          provider: 'resend',
+          delivered: true,
+          message: `Verification email delivered via Resend to ${cleanTo}`
+        };
+      } else {
+        db.saveEmailOutboxLog({
+          recipientEmail: cleanTo,
+          recipientName,
+          otpCode,
+          subject: mailSubject,
+          status: 'failed',
+          provider: 'resend',
+          details: JSON.stringify(data)
+        });
+      }
+    } catch (rErr) {
+      console.error('[EmailDispatcher] Resend error:', rErr.message);
+    }
+  }
+
+  // 3. Development / Simulated Mode (Fallback)
   console.log(`[EmailDispatcher DEV] To: ${cleanTo} | Subject: ${mailSubject} | OTP Code: ${otpCode}`);
+  db.saveEmailOutboxLog({
+    recipientEmail: cleanTo,
+    recipientName,
+    otpCode,
+    subject: mailSubject,
+    status: 'simulated',
+    provider: 'dev_mock',
+    details: 'Simulated dispatch (dev mode)'
+  });
+
   return {
     success: true,
     provider: 'dev_mock',
@@ -125,8 +216,73 @@ async function dispatchEmail({ to, recipientName = 'Trader', otpCode = '', subje
   };
 }
 
+async function sendTestEmail({ to, smtpConfig, senderName, senderEmail }) {
+  const cleanTo = (to || '').trim().toLowerCase();
+  if (!cleanTo || !cleanTo.includes('@')) {
+    return { success: false, error: 'Target test email address is invalid.' };
+  }
+
+  const host = smtpConfig.host;
+  const port = Number(smtpConfig.port || 587);
+  const secure = smtpConfig.secure === true || port === 465;
+  const user = smtpConfig.user;
+  const pass = smtpConfig.pass;
+
+  if (!host || !user || !pass) {
+    return { success: false, error: 'SMTP Host, Username, and Password are required for verification test.' };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+      connectionTimeout: 8000,
+      greetingTimeout: 5000
+    });
+
+    // Verify SMTP handshake
+    await transporter.verify();
+
+    const fromName = senderName || 'DFQ Trade Crow Dispatcher Test';
+    const testCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const testHtml = buildOtpEmailHtml('Administrator', testCode, 'test');
+
+    const info = await transporter.sendMail({
+      from: `"${fromName}" <${user}>`,
+      to: cleanTo,
+      subject: `DFQ Trade Crow - Dispatcher Test Email [${testCode}]`,
+      html: testHtml
+    });
+
+    db.saveEmailOutboxLog({
+      recipientEmail: cleanTo,
+      recipientName: 'Administrator',
+      otpCode: testCode,
+      subject: 'Dispatcher Test Email',
+      status: 'delivered',
+      provider: 'smtp',
+      details: `Test verified. MessageId: ${info.messageId || 'OK'}`
+    });
+
+    return {
+      success: true,
+      message: `Test email sent successfully to ${cleanTo}! SMTP handshake verified.`,
+      messageId: info.messageId
+    };
+  } catch (err) {
+    console.error('[EmailDispatcher Test Error]', err);
+    return {
+      success: false,
+      error: `SMTP Verification Failed: ${err.message}`
+    };
+  }
+}
+
 module.exports = {
   dispatchEmail,
+  sendTestEmail,
   buildOtpEmailHtml,
   buildStatusNotificationHtml
 };

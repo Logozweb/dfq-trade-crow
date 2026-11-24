@@ -7,8 +7,22 @@ const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { db, createOtpInDb, verifyOtpInDb, createNotification } = require('./db');
-const { dispatchEmail, buildOtpEmailHtml, buildStatusNotificationHtml } = require('./emailDispatcher');
+const { 
+  db, 
+  createOtpInDb, 
+  verifyOtpInDb, 
+  createNotification,
+  getEmailSettingsFromDb,
+  saveEmailSettingsToDb,
+  saveEmailOutboxLog,
+  getEmailOutboxLogs
+} = require('./db');
+const { 
+  dispatchEmail, 
+  sendTestEmail,
+  buildOtpEmailHtml, 
+  buildStatusNotificationHtml 
+} = require('./emailDispatcher');
 
 const app = express();
 
@@ -1462,6 +1476,98 @@ app.get('/api/admin/kyc/pending', (req, res) => {
   `).all();
 
   return sendJson(res, true, 'Pending KYC applications fetched.', { applications });
+});
+
+// Dedicated Administrator Login Endpoint
+app.post('/api/admin/login', (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return sendJson(res, false, 'Admin email and password are required.', null, 400);
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail);
+  if (!user) {
+    return sendJson(res, false, 'Invalid administrator credentials.', null, 401);
+  }
+
+  const matches = bcrypt.compareSync(password, user.password_hash);
+  if (!matches) {
+    return sendJson(res, false, 'Invalid administrator credentials.', null, 401);
+  }
+
+  if (user.is_admin !== 1) {
+    return sendJson(res, false, 'Access denied: This portal is strictly restricted to authorized platform administrators.', null, 403);
+  }
+
+  req.session.userId = user.id;
+  const safeUser = { ...user };
+  delete safeUser.password_hash;
+  return sendJson(res, true, 'Administrator authenticated successfully.', {
+    user: safeUser,
+    redirect: '/admin'
+  });
+});
+
+// Admin Email Settings - Get Current Config
+app.get('/api/admin/email-settings', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const settings = getEmailSettingsFromDb();
+  return sendJson(res, true, 'Email dispatcher settings fetched.', { settings });
+});
+
+// Admin Email Settings - Save Config
+app.post('/api/admin/email-settings', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const { provider, smtp, resendApiKey, senderName, senderEmail, subjectLine } = req.body || {};
+  const updated = saveEmailSettingsToDb({
+    provider,
+    smtp,
+    resendApiKey,
+    senderName,
+    senderEmail,
+    subjectLine
+  });
+
+  return sendJson(res, true, 'Email dispatcher configuration saved successfully.', { settings: updated });
+});
+
+// Admin Email Settings - Test Dispatch
+app.post('/api/admin/email-settings/test', async (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const { to, smtp, senderName, senderEmail } = req.body || {};
+  if (!to) {
+    return sendJson(res, false, 'Recipient email address is required for testing.', null, 400);
+  }
+
+  const result = await sendTestEmail({
+    to,
+    smtpConfig: smtp || {},
+    senderName,
+    senderEmail
+  });
+
+  if (result.success) {
+    return sendJson(res, true, result.message, result);
+  } else {
+    return sendJson(res, false, result.error, result, 400);
+  }
+});
+
+// Admin Email Outbox - Activity Log
+app.get('/api/admin/email-outbox', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const limit = Math.min(100, Math.max(10, parseInt(req.query.limit) || 50));
+  const logs = getEmailOutboxLogs(limit);
+  return sendJson(res, true, 'Email outbox logs fetched.', { logs });
 });
 
 module.exports = app;

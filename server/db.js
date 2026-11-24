@@ -149,6 +149,29 @@ function initSchema() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS email_settings (
+      id TEXT PRIMARY KEY,
+      provider TEXT DEFAULT 'smtp',
+      smtp_config TEXT,
+      resend_api_key TEXT,
+      sender_name TEXT DEFAULT 'DFQ Trade Crow Security',
+      sender_email TEXT DEFAULT 'no-reply@dfqtradecrow.com',
+      subject_line TEXT DEFAULT 'DFQ Trade Crow - Your Verification Code',
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS email_outbox (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      recipient_email TEXT NOT NULL,
+      recipient_name TEXT,
+      otp_code TEXT,
+      subject TEXT,
+      status TEXT DEFAULT 'sent',
+      provider TEXT DEFAULT 'smtp',
+      details TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Safely ensure dual-OTP & escrow columns exist on swap_offers
@@ -309,10 +332,101 @@ function createNotification(userId, title, message, type = 'info', link = null) 
   }
 }
 
+function getEmailSettingsFromDb() {
+  try {
+    const row = db.prepare('SELECT * FROM email_settings WHERE id = ?').get('primary');
+    if (row) {
+      let smtp = { host: 'smtp.gmail.com', port: '587', secure: false, user: '', pass: '', senderName: 'DFQ Trade Crow Security' };
+      try {
+        if (row.smtp_config) smtp = { ...smtp, ...JSON.parse(row.smtp_config) };
+      } catch (_) {}
+      return {
+        provider: row.provider || 'smtp',
+        smtp,
+        resendApiKey: row.resend_api_key || '',
+        senderName: row.sender_name || 'DFQ Trade Crow Security',
+        senderEmail: row.sender_email || 'no-reply@dfqtradecrow.com',
+        subjectLine: row.subject_line || 'DFQ Trade Crow - Your Verification Code',
+        updatedAt: row.updated_at
+      };
+    }
+  } catch (err) {
+    console.error('[DB] getEmailSettingsFromDb error:', err);
+  }
+
+  return {
+    provider: 'smtp',
+    smtp: { host: 'smtp.gmail.com', port: '587', secure: false, user: '', pass: '', senderName: 'DFQ Trade Crow Security' },
+    resendApiKey: '',
+    senderName: 'DFQ Trade Crow Security',
+    senderEmail: 'no-reply@dfqtradecrow.com',
+    subjectLine: 'DFQ Trade Crow - Your Verification Code'
+  };
+}
+
+function saveEmailSettingsToDb(settings) {
+  try {
+    const existing = db.prepare('SELECT id FROM email_settings WHERE id = ?').get('primary');
+    const smtpConfigJson = JSON.stringify(settings.smtp || {});
+    const provider = settings.provider || 'smtp';
+    const resendApiKey = settings.resendApiKey || '';
+    const senderName = settings.senderName || 'DFQ Trade Crow Security';
+    const senderEmail = settings.senderEmail || 'no-reply@dfqtradecrow.com';
+    const subjectLine = settings.subjectLine || 'DFQ Trade Crow - Your Verification Code';
+
+    if (existing) {
+      db.prepare(`
+        UPDATE email_settings
+        SET provider = ?, smtp_config = ?, resend_api_key = ?, sender_name = ?, sender_email = ?, subject_line = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(provider, smtpConfigJson, resendApiKey, senderName, senderEmail, subjectLine, 'primary');
+    } else {
+      db.prepare(`
+        INSERT INTO email_settings (id, provider, smtp_config, resend_api_key, sender_name, sender_email, subject_line)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run('primary', provider, smtpConfigJson, resendApiKey, senderName, senderEmail, subjectLine);
+    }
+    return getEmailSettingsFromDb();
+  } catch (err) {
+    console.error('[DB] saveEmailSettingsToDb error:', err);
+    throw err;
+  }
+}
+
+function saveEmailOutboxLog({ recipientEmail, recipientName = 'Trader', otpCode = '', subject = '', status = 'sent', provider = 'smtp', details = '' }) {
+  try {
+    const res = db.prepare(`
+      INSERT INTO email_outbox (recipient_email, recipient_name, otp_code, subject, status, provider, details)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(recipientEmail, recipientName, otpCode, subject, status, provider, details);
+    return res.lastInsertRowid;
+  } catch (err) {
+    console.error('[DB] saveEmailOutboxLog error:', err);
+    return null;
+  }
+}
+
+function getEmailOutboxLogs(limit = 50) {
+  try {
+    return db.prepare(`
+      SELECT * FROM email_outbox
+      ORDER BY id DESC
+      LIMIT ?
+    `).all(limit);
+  } catch (err) {
+    console.error('[DB] getEmailOutboxLogs error:', err);
+    return [];
+  }
+}
+
 module.exports = {
   db,
   initSchema,
   createOtpInDb,
   verifyOtpInDb,
-  createNotification
+  createNotification,
+  getEmailSettingsFromDb,
+  saveEmailSettingsToDb,
+  saveEmailOutboxLog,
+  getEmailOutboxLogs
 };

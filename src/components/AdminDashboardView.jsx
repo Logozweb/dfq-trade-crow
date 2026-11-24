@@ -1,18 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import {
   ShieldAlert, ShieldCheck, CheckCircle2, XCircle, Clock, Users,
-  Package, ArrowLeftRight, Coins, AlertTriangle, Eye, Search,
-  RefreshCw, Check, X, ExternalLink, Filter
+  Package, ArrowLeftRight, Coins, AlertTriangle, Eye, EyeOff, Search,
+  RefreshCw, Check, X, ExternalLink, Filter, Mail, Send, Server, Key,
+  Inbox, Database, CheckCircle
 } from 'lucide-react';
 
 export default function AdminDashboardView({ onBackToMarketplace }) {
-  const [activeTab, setActiveTab] = useState('kyc'); // 'kyc', 'listings', 'users', 'swaps', 'all_items'
+  const [activeTab, setActiveTab] = useState('kyc'); // 'kyc', 'listings', 'email_dispatcher', 'users', 'swaps', 'all_items'
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Email Dispatcher State
+  const [emailSettings, setEmailSettings] = useState({
+    provider: 'smtp',
+    smtp: { host: 'smtp.gmail.com', port: '587', secure: false, user: '', pass: '', senderName: 'DFQ Trade Crow Security' },
+    resendApiKey: '',
+    senderName: 'DFQ Trade Crow Security',
+    senderEmail: 'no-reply@dfqtradecrow.com',
+    subjectLine: 'DFQ Trade Crow - Your Verification Code'
+  });
+  const [showPass, setShowPass] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [testRecipient, setTestRecipient] = useState('');
+  const [testResult, setTestResult] = useState(null);
+  const [outboxLogs, setOutboxLogs] = useState([]);
+  const [outboxLoading, setOutboxLoading] = useState(false);
 
   const fetchAdminData = async () => {
     setLoading(true);
@@ -31,9 +49,98 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
     }
   };
 
+  const fetchEmailSettings = async () => {
+    try {
+      const res = await fetch('/api/admin/email-settings');
+      const json = await res.json();
+      if (json.success && json.data.settings) {
+        setEmailSettings(json.data.settings);
+      }
+    } catch (_) {}
+  };
+
+  const fetchEmailOutbox = async () => {
+    setOutboxLoading(true);
+    try {
+      const res = await fetch('/api/admin/email-outbox');
+      const json = await res.json();
+      setOutboxLoading(false);
+      if (json.success && json.data.logs) {
+        setOutboxLogs(json.data.logs);
+      }
+    } catch (_) {
+      setOutboxLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchAdminData();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'email_dispatcher') {
+      fetchEmailSettings();
+      fetchEmailOutbox();
+    }
+  }, [activeTab]);
+
+  const handleSaveEmailSettings = async (e) => {
+    if (e) e.preventDefault();
+    setEmailSaving(true);
+    try {
+      const res = await fetch('/api/admin/email-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emailSettings)
+      });
+      const json = await res.json();
+      setEmailSaving(false);
+      if (json.success) {
+        showToast('Email dispatcher settings saved successfully!');
+        if (json.data.settings) setEmailSettings(json.data.settings);
+      } else {
+        alert(json.message || 'Failed to save settings.');
+      }
+    } catch (_) {
+      setEmailSaving(false);
+      alert('Error saving email settings.');
+    }
+  };
+
+  const handleSendTestEmail = async (e) => {
+    if (e) e.preventDefault();
+    if (!testRecipient.trim()) {
+      alert('Please enter a recipient email address for testing.');
+      return;
+    }
+    setTestingEmail(true);
+    setTestResult(null);
+    try {
+      const res = await fetch('/api/admin/email-settings/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: testRecipient.trim(),
+          smtp: emailSettings.smtp,
+          senderName: emailSettings.senderName,
+          senderEmail: emailSettings.senderEmail
+        })
+      });
+      const json = await res.json();
+      setTestingEmail(false);
+      setTestResult({
+        success: json.success,
+        message: json.message || json.error || (json.success ? 'Test email dispatched successfully!' : 'Dispatch error.')
+      });
+      fetchEmailOutbox();
+    } catch (err) {
+      setTestingEmail(false);
+      setTestResult({
+        success: false,
+        message: 'Network connection failure while attempting test dispatch.'
+      });
+    }
+  };
 
   const showToast = (msg) => {
     setToast(msg);
@@ -348,6 +455,18 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
         >
           <ArrowLeftRight className="w-3.5 h-3.5" />
           <span>Escrow & Barter Deals</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('email_dispatcher')}
+          className={`px-3.5 py-2 rounded-xl border-0 cursor-pointer flex items-center gap-1.5 transition-all ${
+            activeTab === 'email_dispatcher'
+              ? 'bg-sky-600 text-white shadow-sm'
+              : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Mail className="w-3.5 h-3.5" />
+          <span>Email Dispatcher</span>
         </button>
       </div>
 
@@ -803,6 +922,331 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 6: Email Dispatcher Configuration */}
+      {activeTab === 'email_dispatcher' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Mail className="w-5 h-5 text-sky-500" />
+                <span>Email Dispatcher &amp; SMTP Configuration</span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Configure platform outbound email routing for registration OTPs, KYC decisions, and trade notifications.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${
+                emailSettings.provider === 'smtp' && emailSettings.smtp?.user
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300'
+                  : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
+              }`}>
+                <Server className="w-3.5 h-3.5" />
+                <span>
+                  {emailSettings.provider === 'smtp' && emailSettings.smtp?.user ? 'Live SMTP Transport' : 'Simulated / Dev Dispatch'}
+                </span>
+              </span>
+              <button
+                onClick={() => { fetchEmailSettings(); fetchEmailOutbox(); }}
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 cursor-pointer"
+                title="Refresh Dispatcher"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left 7 cols: Transport Settings Form */}
+            <div className="lg:col-span-7 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Server className="w-4 h-4 text-sky-500" />
+                <span>Outbound Mail Transport</span>
+              </h3>
+
+              {/* Provider Selection */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  Select Dispatch Provider
+                </label>
+                <div className="grid grid-cols-3 gap-2.5">
+                  {[
+                    { id: 'smtp', label: 'Custom SMTP', desc: 'Gmail, Mailgun, Brevo, AWS' },
+                    { id: 'resend', label: 'Resend API', desc: 'Direct REST API key' },
+                    { id: 'simulated', label: 'Dev / Mock', desc: 'Simulated for testing' }
+                  ].map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setEmailSettings(prev => ({ ...prev, provider: p.id }))}
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                        emailSettings.provider === p.id
+                          ? 'border-sky-500 bg-sky-50/50 dark:bg-sky-950/40 text-sky-900 dark:text-sky-200 ring-2 ring-sky-500/20'
+                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="font-bold text-xs">{p.label}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">{p.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* SMTP Settings Fields */}
+              {emailSettings.provider === 'smtp' && (
+                <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                        SMTP Host Server
+                      </label>
+                      <input
+                        type="text"
+                        value={emailSettings.smtp?.host || ''}
+                        onChange={(e) => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, host: e.target.value } }))}
+                        placeholder="smtp.gmail.com"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                        SMTP Port
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={emailSettings.smtp?.port || ''}
+                          onChange={(e) => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, port: e.target.value } }))}
+                          placeholder="587"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, secure: !prev.smtp?.secure } }))}
+                          className={`px-3 py-2 rounded-xl border text-[11px] font-semibold cursor-pointer shrink-0 ${
+                            emailSettings.smtp?.secure
+                              ? 'bg-sky-50 text-sky-700 border-sky-300 dark:bg-sky-950 dark:text-sky-300'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          {emailSettings.smtp?.secure ? 'SSL (465)' : 'TLS (587)'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                        SMTP Username / Email
+                      </label>
+                      <input
+                        type="text"
+                        value={emailSettings.smtp?.user || ''}
+                        onChange={(e) => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, user: e.target.value } }))}
+                        placeholder="your-email@gmail.com"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                        SMTP Password / App Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPass ? 'text' : 'password'}
+                          value={emailSettings.smtp?.pass || ''}
+                          onChange={(e) => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, pass: e.target.value } }))}
+                          placeholder="App Password or API secret"
+                          className="w-full pl-3 pr-9 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPass(!showPass)}
+                          className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 bg-transparent border-0 cursor-pointer p-0"
+                        >
+                          {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Resend API Key Field */}
+              {emailSettings.provider === 'resend' && (
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    Resend API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={emailSettings.resendApiKey || ''}
+                    onChange={(e) => setEmailSettings(prev => ({ ...prev, resendApiKey: e.target.value }))}
+                    placeholder="re_1234567890abcdef..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+              )}
+
+              {/* Sender Identity Section */}
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">
+                  Sender Identity Branding
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
+                      From Display Name
+                    </label>
+                    <input
+                      type="text"
+                      value={emailSettings.senderName || ''}
+                      onChange={(e) => setEmailSettings(prev => ({ ...prev, senderName: e.target.value }))}
+                      placeholder="DFQ Trade Crow Security"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
+                      From Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={emailSettings.senderEmail || ''}
+                      onChange={(e) => setEmailSettings(prev => ({ ...prev, senderEmail: e.target.value }))}
+                      placeholder="no-reply@dfqtradecrow.com"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
+                    Default OTP Subject Line
+                  </label>
+                  <input
+                    type="text"
+                    value={emailSettings.subjectLine || ''}
+                    onChange={(e) => setEmailSettings(prev => ({ ...prev, subjectLine: e.target.value }))}
+                    placeholder="DFQ Trade Crow - Your Verification Code"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  disabled={emailSaving}
+                  onClick={handleSaveEmailSettings}
+                  className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs border-0 cursor-pointer shadow-sm shadow-sky-600/20 disabled:opacity-50 transition-all flex items-center gap-2"
+                >
+                  {emailSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  <span>Save Dispatcher Configuration</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Right 5 cols: Live SMTP Test & Outbox */}
+            <div className="lg:col-span-5 space-y-6">
+              {/* Test Email Card */}
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Send className="w-4 h-4 text-sky-500" />
+                  <span>Test Email Handshake</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Send a live test verification code to verify your SMTP server connection and SSL/TLS credentials.
+                </p>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
+                      Test Recipient Email
+                    </label>
+                    <input
+                      type="email"
+                      value={testRecipient}
+                      onChange={(e) => setTestRecipient(e.target.value)}
+                      placeholder="you@example.com"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={testingEmail}
+                    onClick={handleSendTestEmail}
+                    className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-semibold text-xs border-0 cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                  >
+                    {testingEmail ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                    <span>{testingEmail ? 'Testing Connection...' : 'Send Test Dispatch'}</span>
+                  </button>
+
+                  {testResult && (
+                    <div className={`p-3.5 rounded-xl text-xs flex items-start gap-2.5 border ${
+                      testResult.success
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60'
+                        : 'bg-red-50 text-red-800 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/60'
+                    }`}>
+                      {testResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> : <XCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />}
+                      <span className="leading-relaxed">{testResult.message}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Outbox Activity Card */}
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Inbox className="w-4 h-4 text-sky-500" />
+                    <span>Recent Dispatch Log</span>
+                  </h3>
+                  <button
+                    onClick={fetchEmailOutbox}
+                    className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 bg-transparent border-0 cursor-pointer hover:underline flex items-center gap-1"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${outboxLoading ? 'animate-spin' : ''}`} />
+                    <span>Refresh</span>
+                  </button>
+                </div>
+
+                {outboxLogs.length === 0 ? (
+                  <div className="text-center py-6 text-xs text-slate-400">
+                    No outbound emails logged yet.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
+                    {outboxLogs.slice(0, 10).map((log) => (
+                      <div key={log.id} className="p-3 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-800/40 text-xs">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <strong className="text-slate-900 dark:text-white font-medium truncate">{log.recipient_email}</strong>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            log.status === 'delivered'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                              : log.status === 'simulated'
+                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                              : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                          }`}>
+                            {log.status}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                          <span>{log.subject || 'OTP Code'}</span>
+                          <span className="font-mono text-[10px]">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
