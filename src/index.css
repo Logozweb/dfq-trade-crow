@@ -12,10 +12,10 @@
   --dfq-text-muted: #64748b;
   --dfq-text-subtle: #94a3b8;
 
-  --dfq-primary: #1d4ed8;
-  --dfq-primary-hover: #1e40af;
-  --dfq-primary-light: #eff6ff;
-  --dfq-primary-border: #bfdbfe;
+  --dfq-primary: #0284c7;
+  --dfq-primary-hover: #0369a1;
+  --dfq-primary-light: #f0f9ff;
+  --dfq-primary-border: #bae6fd;
 
   --dfq-emerald: #059669;
   --dfq-emerald-bg: #ecfdf5;
@@ -50,10 +50,10 @@
   --dfq-text-muted: #94a3b8;
   --dfq-text-subtle: #64748b;
 
-  --dfq-primary: #3b82f6;
-  --dfq-primary-hover: #60a5fa;
-  --dfq-primary-light: rgba(59, 130, 246, 0.14);
-  --dfq-primary-border: rgba(59, 130, 246, 0.32);
+  --dfq-primary: #38bdf8;
+  --dfq-primary-hover: #7dd3fc;
+  --dfq-primary-light: rgba(56, 189, 248, 0.15);
+  --dfq-primary-border: rgba(56, 189, 248, 0.35);
 
   --dfq-emerald: #10b981;
   --dfq-emerald-bg: rgba(16, 185, 129, 0.14);
@@ -107,4 +107,31 @@ h1, h2, h3, h4, h5, h6 {
 ::-webkit-scrollbar-thumb {
   background: var(--dfq-border-strong);
   border-radius: 9999px;
+}
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(1deg); }
+}
+
+@keyframes floatFast {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(-1deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.06); }
+}
+
+.animate-float-slow {
+  animation: floatSlow 7s ease-in-out infinite;
+}
+
+.animate-float-fast {
+  animation: floatFast 4.5s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 8s ease-in-out infinite;
 }

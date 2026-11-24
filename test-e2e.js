@@ -89,19 +89,32 @@ const server = app.listen(5099, '127.0.0.1', async () => {
     console.log(`Status: ${adminRes.status}, Registered Users: ${adminRes.data.stats.users}, Listings: ${adminRes.data.stats.items}`);
     if (!adminRes.data.success) throw new Error('Admin data API failed');
 
-    // 8. User Registration with Referral Code
+    // 8. User Registration with Referral Code & OTP
     console.log('\n--- 8. Testing User Registration with Referral ---');
     cookie = ''; // clear session
-    const regRes = await request('POST', '/api/auth.php?action=register', {
+    const testEmail = `emeka_${Date.now()}@dfqtrade.test`;
+    const regStep1 = await request('POST', '/api/auth.php?action=register', {
       full_name: 'Test Trader Emeka',
-      email: `emeka_${Date.now()}@dfqtrade.test`,
+      email: testEmail,
       phone: '08099887766',
       location: 'Ikeja, Lagos',
       password: 'mypassword123',
       ref_code: 'DFQ-MASTER'
     });
+    const regRes = await request('POST', '/api/auth.php?action=register', {
+      full_name: 'Test Trader Emeka',
+      email: testEmail,
+      phone: '08099887766',
+      location: 'Ikeja, Lagos',
+      password: 'mypassword123',
+      ref_code: 'DFQ-MASTER',
+      otp_code: regStep1.data.devOtpCode
+    });
     console.log(`Status: ${regRes.status}, Message: ${regRes.data.message}, RefCode: ${regRes.data.user.referral_code}`);
     if (!regRes.data.success) throw new Error('Registration failed');
+
+    // Approve KYC for Emeka so listing can proceed
+    db.prepare(`UPDATE users SET kyc_status = 'approved', kyc_tier = 2 WHERE id = ?`).run(regRes.data.user.id);
 
     // 9. Create New Listing
     console.log('\n--- 9. Testing Create Item Listing ---');

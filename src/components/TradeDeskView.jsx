@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Kanban, ArrowLeftRight, Clock, CheckCircle2, XCircle, ShieldCheck, Tag, Wallet, Eye } from 'lucide-react';
+import {
+  Kanban, ArrowLeftRight, Clock, CheckCircle2, XCircle, ShieldCheck, Tag,
+  Wallet, Eye, AlertCircle, Package, Send, Check, X, QrCode
+} from 'lucide-react';
 
 export default function TradeDeskView({ user, onOpenChat }) {
-  const [activeTab, setActiveTab] = useState('incoming');
+  const [activeTab, setActiveTab] = useState('my_listings'); // 'my_listings', 'incoming', 'outgoing', 'pawn'
   const [incomingOffers, setIncomingOffers] = useState([]);
   const [outgoingOffers, setOutgoingOffers] = useState([]);
   const [myItems, setMyItems] = useState([]);
@@ -54,7 +57,7 @@ export default function TradeDeskView({ user, onOpenChat }) {
       });
       const data = await res.json();
       if (data.success) {
-        setToastMsg('Dual-OTP Handover Verified! Escrow released.');
+        setToastMsg('Dual-OTP Handover Verified! Escrow released and swap marked complete.');
         setHandoverOffer(null);
         setOtpInput('');
         loadData();
@@ -102,61 +105,65 @@ export default function TradeDeskView({ user, onOpenChat }) {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full">
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="mb-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 text-emerald-800 dark:text-emerald-300 text-xs flex justify-between items-center">
-          <span>{toastMsg}</span>
-          <button onClick={() => setToastMsg('')} className="border-0 bg-transparent cursor-pointer font-bold">&times;</button>
+        <div className="mb-4 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 text-emerald-800 dark:text-emerald-300 text-xs flex justify-between items-center animate-in fade-in">
+          <span className="font-medium">{toastMsg}</span>
+          <button onClick={() => setToastMsg('')} className="border-0 bg-transparent cursor-pointer font-bold text-slate-400 hover:text-slate-600">&times;</button>
         </div>
       )}
 
       {/* Top Desk Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 pb-4 border-b" style={{ borderColor: 'var(--dfq-border)' }}>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: 'var(--dfq-text)' }}>
-            Trade Desk &amp; Active Collateral
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Trader Operations Desk
           </h2>
           <p className="text-xs text-slate-500 mb-0">
-            Manage incoming barter proposals, Dual-OTP handovers, and pawn buyback timelines.
+            Track your listings, manage incoming barter deals, inspect Dual-OTP handovers, and monitor pawn buybacks.
           </p>
         </div>
-        <div className="text-xs font-medium px-3 py-1.5 rounded-lg border flex items-center gap-1.5" style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border)' }}>
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+        <div className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 flex items-center gap-1.5">
+          <ShieldCheck className="w-4 h-4 text-sky-500" />
           <span>Active Escrow Protection: Enabled</span>
         </div>
       </div>
 
       {/* Stats Cluster */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <div className="p-3.5 rounded-xl border" style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border)' }}>
-          <span className="text-[11px] text-slate-400 font-medium block mb-1">Incoming Proposals</span>
-          <span className="text-xl font-bold" style={{ color: 'var(--dfq-text)' }}>{incomingOffers.length}</span>
+        <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <span className="text-[11px] text-slate-400 font-semibold block mb-1">My Listings</span>
+          <span className="text-2xl font-bold text-slate-900 dark:text-white">{myItems.length}</span>
         </div>
-        <div className="p-3.5 rounded-xl border" style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border)' }}>
-          <span className="text-[11px] text-slate-400 font-medium block mb-1">Outgoing Proposals</span>
-          <span className="text-xl font-bold" style={{ color: 'var(--dfq-text)' }}>{outgoingOffers.length}</span>
+        <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <span className="text-[11px] text-slate-400 font-semibold block mb-1">Incoming Proposals</span>
+          <span className="text-2xl font-bold text-sky-600 dark:text-sky-400">{incomingOffers.length}</span>
         </div>
-        <div className="p-3.5 rounded-xl border" style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border)' }}>
-          <span className="text-[11px] text-slate-400 font-medium block mb-1">My Posted Listings</span>
-          <span className="text-xl font-bold" style={{ color: 'var(--dfq-text)' }}>{myItems.length}</span>
+        <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <span className="text-[11px] text-slate-400 font-semibold block mb-1">Outgoing Proposals</span>
+          <span className="text-2xl font-bold text-slate-900 dark:text-white">{outgoingOffers.length}</span>
         </div>
-        <div className="p-3.5 rounded-xl border" style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border)' }}>
-          <span className="text-[11px] text-slate-400 font-medium block mb-1">KYC Trader Tier</span>
-          <span className="text-xl font-bold text-blue-600">Tier {user?.kyc_tier || 1}</span>
+        <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <span className="text-[11px] text-slate-400 font-semibold block mb-1">KYC Trader Status</span>
+          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 capitalize flex items-center gap-1 mt-1">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>{user?.kyc_status || 'Unverified'} (Tier {user?.kyc_tier || 1})</span>
+          </span>
         </div>
       </div>
 
       {/* Desk Tabs */}
-      <div className="flex border-b mb-6 gap-2" style={{ borderColor: 'var(--dfq-border)' }}>
+      <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6 gap-2 text-xs font-semibold overflow-x-auto pb-1">
         {[
-          { key: 'incoming', label: `Incoming Proposals (${incomingOffers.length})` },
-          { key: 'outgoing', label: `Outgoing Proposals (${outgoingOffers.length})` },
-          { key: 'pawn', label: 'Pawn & Collateral Desk' }
+          { key: 'my_listings', label: `My Items (${myItems.length})` },
+          { key: 'incoming', label: `Incoming Offers (${incomingOffers.length})` },
+          { key: 'outgoing', label: `Sent Offers (${outgoingOffers.length})` },
+          { key: 'pawn', label: 'Pawn Collateral Desk' }
         ].map(t => (
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key)}
-            className={`pb-2.5 px-3 text-xs font-semibold border-b-2 cursor-pointer transition-all ${
+            className={`pb-2.5 px-3 border-b-2 cursor-pointer transition-all whitespace-nowrap ${
               activeTab === t.key
-                ? 'border-blue-600 text-blue-600'
+                ? 'border-sky-600 text-sky-600 dark:text-sky-400 font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             }`}
           >
@@ -165,25 +172,88 @@ export default function TradeDeskView({ user, onOpenChat }) {
         ))}
       </div>
 
-      {/* TAB 1: Incoming Offers */}
+      {/* TAB 1: My Items & Admin Review Badges */}
+      {activeTab === 'my_listings' && (
+        <div className="space-y-3">
+          {myItems.length === 0 ? (
+            <div className="text-center py-12 text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900">
+              You haven't posted any items yet. Click "+ Post Listing" above.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {myItems.map(item => (
+                <div
+                  key={item.id}
+                  className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        item.status === 'Active'
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                          : item.status === 'pending_review'
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                          : item.status === 'Swapped'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                          : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                      }`}>
+                        {item.status === 'pending_review' ? 'Pending Admin Review' : item.status === 'Active' ? 'Live on Marketplace' : item.status}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-mono">#{item.id}</span>
+                    </div>
+
+                    <div className="aspect-video w-full rounded-xl bg-slate-100 dark:bg-slate-800 overflow-hidden mb-3">
+                      <img src={item.image_path} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = 'assets/img/phone.svg'; }} />
+                    </div>
+
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-1">{item.title}</h4>
+                    <div className="text-xs text-slate-500 mb-2">
+                      Valuation: <strong className="text-sky-600 dark:text-sky-400">{formatNaira(item.est_value)}</strong> &bull; {item.mode}
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-600 dark:text-slate-300 mb-3">
+                      <span className="text-[10px] font-bold text-slate-400 block uppercase">Wanted:</span>
+                      <span className="line-clamp-1">{item.wanted}</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                    <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                    {item.status === 'pending_review' && (
+                      <span className="text-[11px] text-amber-600 font-semibold flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Awaiting compliance check
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: Incoming Offers */}
       {activeTab === 'incoming' && (
         <div className="space-y-3">
           {incomingOffers.length === 0 ? (
-            <div className="text-center py-12 text-xs text-slate-400 border rounded-xl" style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border)' }}>
+            <div className="text-center py-12 text-xs text-slate-400 border rounded-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
               No incoming proposals at the moment.
             </div>
           ) : (
             incomingOffers.map(offer => (
-              <div key={offer.id} className="p-4 rounded-xl border flex flex-col md:flex-row justify-between gap-4 items-start md:items-center" style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border)' }}>
+              <div
+                key={offer.id}
+                className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col md:flex-row justify-between gap-4 items-start md:items-center"
+              >
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold" style={{ color: 'var(--dfq-text)' }}>{offer.my_item_title}</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">{offer.my_item_title}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">
                       {offer.status}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mb-1">
-                    Offered: <strong style={{ color: 'var(--dfq-text)' }}>{offer.offered_item}</strong> &bull; Cash top-up: <strong className="text-emerald-600">{offer.cash_topup}</strong>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mb-1">
+                    Offered: <strong className="text-slate-900 dark:text-white">{offer.offered_item}</strong> &bull; Cash top-up: <strong className="text-emerald-600">{offer.cash_topup}</strong>
                   </p>
                   {offer.note && <p className="text-[11px] text-slate-400 italic mb-0">"{offer.note}"</p>}
                 </div>
@@ -192,13 +262,13 @@ export default function TradeDeskView({ user, onOpenChat }) {
                     <>
                       <button
                         onClick={() => handleRespond(offer.id, 'In Escrow')}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 border-0 cursor-pointer"
+                        className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 border-0 cursor-pointer shadow-xs"
                       >
                         Accept Deal
                       </button>
                       <button
                         onClick={() => handleRespond(offer.id, 'Declined', 'Value mismatch')}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer bg-transparent"
                       >
                         Decline
                       </button>
@@ -207,7 +277,7 @@ export default function TradeDeskView({ user, onOpenChat }) {
                   {offer.status === 'In Escrow' && (
                     <button
                       onClick={() => setHandoverOffer(offer)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 border-0 cursor-pointer flex items-center gap-1.5"
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 border-0 cursor-pointer flex items-center gap-1.5 shadow-xs"
                     >
                       <ShieldCheck className="w-3.5 h-3.5" />
                       <span>Dual-OTP Handover</span>
@@ -220,21 +290,24 @@ export default function TradeDeskView({ user, onOpenChat }) {
         </div>
       )}
 
-      {/* TAB 2: Outgoing Proposals */}
+      {/* TAB 3: Outgoing Proposals */}
       {activeTab === 'outgoing' && (
         <div className="space-y-3">
           {outgoingOffers.length === 0 ? (
-            <div className="text-center py-12 text-xs text-slate-400 border rounded-xl" style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border)' }}>
+            <div className="text-center py-12 text-xs text-slate-400 border rounded-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
               You haven't proposed any swaps yet.
             </div>
           ) : (
             outgoingOffers.map(offer => (
-              <div key={offer.id} className="p-4 rounded-xl border flex justify-between items-center" style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border)' }}>
+              <div
+                key={offer.id}
+                className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center"
+              >
                 <div>
-                  <span className="text-xs font-bold block mb-1" style={{ color: 'var(--dfq-text)' }}>Requested: {offer.target_item_title}</span>
+                  <span className="text-xs font-bold block mb-1 text-slate-900 dark:text-white">Requested: {offer.target_item_title}</span>
                   <span className="text-xs text-slate-500">Your offering: {offer.offered_item} ({offer.cash_topup})</span>
                 </div>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full border" style={{ backgroundColor: 'var(--dfq-surface-subtle)', borderColor: 'var(--dfq-border)' }}>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
                   {offer.status}
                 </span>
               </div>
@@ -243,11 +316,11 @@ export default function TradeDeskView({ user, onOpenChat }) {
         </div>
       )}
 
-      {/* TAB 3: Pawn Collateral Desk */}
+      {/* TAB 4: Pawn Collateral Desk */}
       {activeTab === 'pawn' && (
         <div className="space-y-3">
           {myItems.filter(i => i.mode === 'Pawn / Quick Sale').length === 0 ? (
-            <div className="text-center py-12 text-xs text-slate-400 border rounded-xl" style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border)' }}>
+            <div className="text-center py-12 text-xs text-slate-400 border rounded-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
               No active pawned collateral listings.
             </div>
           ) : (
@@ -256,11 +329,14 @@ export default function TradeDeskView({ user, onOpenChat }) {
               const isLiquidated = Number(item.is_liquidated) === 1;
 
               return (
-                <div key={item.id} className="p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3" style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border)' }}>
+                <div
+                  key={item.id}
+                  className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
+                >
                   <div>
-                    <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--dfq-text)' }}>{item.title}</h4>
+                    <h4 className="text-sm font-bold mb-1 text-slate-900 dark:text-white">{item.title}</h4>
                     <p className="text-xs text-slate-500 mb-0">
-                      Advance: <strong>{formatNaira(item.pawn_advance)}</strong> &bull; Buyback Total (10% fee): <strong className="text-blue-600">{formatNaira(item.pawn_buyback)}</strong>
+                      Advance: <strong>{formatNaira(item.pawn_advance)}</strong> &bull; Buyback Total (10% fee): <strong className="text-sky-600 dark:text-sky-400">{formatNaira(item.pawn_buyback)}</strong>
                     </p>
                     <span className="text-[11px] text-amber-600 flex items-center gap-1 mt-1 font-semibold">
                       <Clock className="w-3.5 h-3.5" />
@@ -272,13 +348,13 @@ export default function TradeDeskView({ user, onOpenChat }) {
                       <>
                         <button
                           onClick={() => handleRedeemPawn(item.id)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 border-0 cursor-pointer"
+                          className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 border-0 cursor-pointer shadow-xs"
                         >
                           Redeem
                         </button>
                         <button
                           onClick={() => handleLiquidatePawn(item.id)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-300 cursor-pointer"
+                          className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-amber-700 bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-800 cursor-pointer"
                         >
                           Liquidate
                         </button>
@@ -298,40 +374,39 @@ export default function TradeDeskView({ user, onOpenChat }) {
 
       {/* Dual-OTP Handover Modal */}
       {handoverOffer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-2xl border p-5 shadow-2xl" style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border)' }}>
-            <div className="flex items-center justify-between pb-2 mb-3 border-b" style={{ borderColor: 'var(--dfq-border)' }}>
-              <div className="flex items-center gap-1.5 font-bold text-sm" style={{ color: 'var(--dfq-text)' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl text-slate-900 dark:text-slate-100">
+            <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-1.5 font-bold text-sm">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
                 <span>Dual-OTP Handover Exchange</span>
               </div>
-              <button onClick={() => setHandoverOffer(null)} className="border-0 bg-transparent text-slate-400 hover:text-slate-600 cursor-pointer">
+              <button onClick={() => setHandoverOffer(null)} className="border-0 bg-transparent text-slate-400 hover:text-slate-600 cursor-pointer text-base">
                 &times;
               </button>
             </div>
-            <p className="text-xs text-slate-500 mb-3">
-              Both parties must physically inspect goods. Ask the partner for their 4-digit verification code:
+            <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+              Both parties must physically inspect goods at the meetup hub. Ask the partner for their 4-digit verification code:
             </p>
-            <div className="p-3 rounded-lg border text-center mb-3 bg-blue-50 dark:bg-blue-950/40 border-blue-200">
+            <div className="p-3.5 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-center mb-3">
               <span className="text-[11px] text-slate-400 block mb-0.5">Your Verification Code to Provide to Partner:</span>
-              <span className="text-2xl font-mono font-bold text-blue-600 tracking-widest">{handoverOffer.owner_otp || '4829'}</span>
+              <span className="text-3xl font-mono font-bold text-sky-600 dark:text-sky-400 tracking-widest">{handoverOffer.owner_otp || '4829'}</span>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--dfq-text)' }}>Enter Partner's Code *</label>
+                <label className="block text-xs font-semibold mb-1">Enter Partner's Code *</label>
                 <input
                   type="text"
                   maxLength={4}
                   value={otpInput}
                   onChange={e => setOtpInput(e.target.value)}
                   placeholder="e.g. 5192"
-                  className="w-full px-3 py-2 text-center text-lg font-mono font-bold tracking-widest border rounded-lg outline-none"
-                  style={{ backgroundColor: 'var(--dfq-surface)', borderColor: 'var(--dfq-border-strong)', color: 'var(--dfq-text)' }}
+                  className="w-full px-3 py-2 text-center text-xl font-mono font-bold tracking-widest border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl outline-none focus:border-sky-500"
                 />
               </div>
               <button
                 onClick={handleVerifyOtp}
-                className="w-full py-2.5 rounded-lg text-xs font-semibold text-white border-0 cursor-pointer shadow-sm bg-emerald-600 hover:bg-emerald-700"
+                className="w-full py-2.5 rounded-xl text-xs font-semibold text-white border-0 cursor-pointer shadow-sm bg-emerald-600 hover:bg-emerald-500 transition-colors"
               >
                 Confirm Physical Handover &amp; Release Escrow
               </button>

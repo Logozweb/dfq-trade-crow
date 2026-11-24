@@ -7,7 +7,8 @@ const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { db } = require('./db');
+const { db, createOtpInDb, verifyOtpInDb, createNotification } = require('./db');
+const { dispatchEmail, buildOtpEmailHtml, buildStatusNotificationHtml } = require('./emailDispatcher');
 
 const app = express();
 
@@ -87,11 +88,64 @@ function requireAdmin(req, res) {
 }
 
 // ==========================================
-// AUTHENTICATION ROUTES
+// AUTHENTICATION & EMAIL OTP ROUTES
 // Supports: /api/auth.php?action=... AND /api/auth/...
 // ==========================================
 
-function handleRegister(req, res) {
+async function handleSendOtp(req, res) {
+  const body = req.body || {};
+  const email = (body.email || '').trim().toLowerCase();
+  const name = (body.name || body.full_name || 'Trader').trim();
+  const purpose = (body.purpose || 'registration').trim();
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || !emailRegex.test(email)) {
+    return sendJson(res, false, 'Valid email address is required.', {}, 400);
+  }
+
+  // If registering, check if email is already taken
+  if (purpose === 'registration') {
+    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    if (existing) {
+      return sendJson(res, false, 'An account with this email already exists. Please log in.', {}, 400);
+    }
+  }
+
+  const otpRecord = createOtpInDb(email, name, purpose);
+  const result = await dispatchEmail({
+    to: email,
+    recipientName: name,
+    otpCode: otpRecord.code,
+    purpose
+  });
+
+  return sendJson(res, true, `Verification code sent to ${email}`, {
+    email,
+    delivered: result.delivered,
+    devOtpCode: result.devOtpCode, // Provided for instant offline dev/test convenience
+    expires_at: otpRecord.expiresAt
+  });
+}
+
+function handleVerifyOtp(req, res) {
+  const body = req.body || {};
+  const email = (body.email || '').trim().toLowerCase();
+  const code = (body.code || body.otp_code || '').trim();
+  const purpose = (body.purpose || 'registration').trim();
+
+  if (!email || !code) {
+    return sendJson(res, false, 'Email and 6-digit verification code are required.', {}, 400);
+  }
+
+  const result = verifyOtpInDb(email, code, purpose);
+  if (!result.success) {
+    return sendJson(res, false, result.error, {}, 400);
+  }
+
+  return sendJson(res, true, 'Verification code validated successfully!', { email });
+}
+
+async function handleRegister(req, res) {
   const body = req.body || {};
   const fullName = (body.full_name || '').trim();
   const email = (body.email || '').trim().toLowerCase();
@@ -99,6 +153,7 @@ function handleRegister(req, res) {
   const location = (body.location || 'Lekki, Lagos').trim();
   const password = body.password || '';
   const refInput = (body.ref_code || '').trim().toUpperCase();
+  const otpCode = (body.otp_code || '').trim();
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!fullName || !emailRegex.test(email) || !phone || password.length < 6) {
@@ -110,12 +165,36 @@ function handleRegister(req, res) {
     return sendJson(res, false, 'An account with this email already exists. Try logging in instead.', {}, 200);
   }
 
+  // Requirement 2: Email verification via OTP
+  if (!otpCode) {
+    // Dispatch OTP and instruct client to verify
+    const otpRecord = createOtpInDb(email, fullName, 'registration');
+    const dispatchRes = await dispatchEmail({
+      to: email,
+      recipientName: fullName,
+      otpCode: otpRecord.code,
+      purpose: 'registration'
+    });
+    return sendJson(res, true, 'Verification OTP sent to your email. Enter the 6-digit code to complete registration.', {
+      require_otp: true,
+      email,
+      devOtpCode: dispatchRes.devOtpCode
+    }, 200);
+  }
+
+  // Verify the OTP submitted
+  const verifyRes = verifyOtpInDb(email, otpCode, 'registration');
+  if (!verifyRes.success) {
+    return sendJson(res, false, verifyRes.error, { require_otp: true }, 400);
+  }
+
   let referredBy = null;
   if (refInput) {
     const refUser = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(refInput);
     if (refUser) {
       referredBy = refUser.id;
       db.prepare('UPDATE users SET spotlight_credits = spotlight_credits + 1 WHERE id = ?').run(referredBy);
+      createNotification(referredBy, 'Referral Reward Unlocked', `New trader ${fullName} joined with your code. 1 Spotlight Credit awarded!`, 'referral');
     }
   }
 
@@ -125,14 +204,17 @@ function handleRegister(req, res) {
   const hash = bcrypt.hashSync(password, 10);
 
   const insert = db.prepare(`
-    INSERT INTO users (full_name, email, phone, location, password_hash, referral_code, referred_by, spotlight_credits, is_admin)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+    INSERT INTO users (full_name, email, phone, location, password_hash, referral_code, referred_by, spotlight_credits, is_admin, email_verified, kyc_status, kyc_tier)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, 1, 'unverified', 1)
   `).run(fullName, email, phone, location, hash, myRefCode, referredBy, isAdmin);
 
   const userId = Number(insert.lastInsertRowid);
   req.session.userId = userId;
   req.session.userName = fullName;
   req.session.isAdmin = isAdmin;
+
+  // Create welcome notification
+  createNotification(userId, 'Welcome to DFQ Trade Crow', 'Your email is verified! Complete your KYC verification (NIN / Government ID) to unlock listing privileges and start trading.', 'kyc');
 
   const userObj = {
     id: userId,
@@ -142,10 +224,13 @@ function handleRegister(req, res) {
     location,
     referral_code: myRefCode,
     spotlight_credits: 1,
-    is_admin: isAdmin
+    is_admin: isAdmin,
+    email_verified: 1,
+    kyc_status: 'unverified',
+    kyc_tier: 1
   };
 
-  return sendJson(res, true, isAdmin ? 'Admin account created!' : 'Account created! You received 1 free Spotlight Boost.', { user: userObj }, 201);
+  return sendJson(res, true, isAdmin ? 'Admin account created!' : 'Account verified and created! You received 1 free Spotlight Boost.', { user: userObj }, 201);
 }
 
 function handleLogin(req, res) {
@@ -153,7 +238,14 @@ function handleLogin(req, res) {
   const email = (body.email || '').trim().toLowerCase();
   const password = body.password || '';
 
-  const user = db.prepare('SELECT id, full_name, email, phone, location, referral_code, spotlight_credits, password_hash, is_admin FROM users WHERE email = ?').get(email);
+  const user = db.prepare(`
+    SELECT id, full_name, email, phone, location, referral_code, spotlight_credits, password_hash, is_admin,
+           COALESCE(kyc_tier, 1) AS kyc_tier,
+           COALESCE(kyc_status, 'unverified') AS kyc_status,
+           COALESCE(email_verified, 0) AS email_verified
+    FROM users WHERE email = ?
+  `).get(email);
+
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return sendJson(res, false, 'Invalid email or password.', {}, 200);
   }
@@ -173,7 +265,14 @@ function handleMe(req, res) {
     return sendJson(res, true, 'Guest', { authenticated: false });
   }
 
-  const user = db.prepare('SELECT id, full_name, email, phone, location, referral_code, spotlight_credits, is_admin, COALESCE(kyc_tier, 1) AS kyc_tier FROM users WHERE id = ?').get(Number(req.session.userId));
+  const user = db.prepare(`
+    SELECT id, full_name, email, phone, location, referral_code, spotlight_credits, is_admin,
+           COALESCE(kyc_tier, 1) AS kyc_tier,
+           COALESCE(kyc_status, 'unverified') AS kyc_status,
+           COALESCE(email_verified, 0) AS email_verified
+    FROM users WHERE id = ?
+  `).get(Number(req.session.userId));
+
   if (!user) {
     req.session.destroy();
     return sendJson(res, true, 'Guest', { authenticated: false });
@@ -197,25 +296,96 @@ function handleReferralInfo(req, res) {
   });
 }
 
-function handleKycVerify(req, res) {
+function handleKycSubmit(req, res) {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
   const tier = parseInt(req.body.tier || '2', 10);
+  const fullName = (req.body.full_name || req.session.userName || 'Trader').trim();
+  const phone = (req.body.phone || '').trim();
   const ninBvn = (req.body.nin_bvn || '').trim();
+  const idType = (req.body.id_type || 'NIN').trim();
   const businessName = (req.body.business_name || '').trim();
   const businessAddress = (req.body.business_address || '').trim();
+  const cacNumber = (req.body.cac_number || '').trim();
 
-  if (tier === 2) {
-    db.prepare('UPDATE users SET kyc_tier = 2, nin_bvn = ? WHERE id = ?').run(ninBvn || 'NIN-VERIFIED', userId);
-    return sendJson(res, true, 'Tier 2 Verification Approved! Blue Shield Badge unlocked.', { kyc_tier: 2 });
-  } else if (tier === 3) {
-    if (!businessName) return sendJson(res, false, 'Business name required for Pro Merchant status.', {}, 400);
-    db.prepare('UPDATE users SET kyc_tier = 3, business_name = ?, business_address = ? WHERE id = ?').run(businessName, businessAddress || 'Storefront Verified', userId);
-    return sendJson(res, true, 'Tier 3 Pro Merchant Approved! Gold Seal Badge unlocked.', { kyc_tier: 3 });
+  if (!ninBvn) {
+    return sendJson(res, false, 'National Identification Number (NIN) or BVN is required for verification.', {}, 400);
   }
 
-  return sendJson(res, false, 'Invalid KYC tier.', {}, 400);
+  if (tier === 3 && !businessName) {
+    return sendJson(res, false, 'Registered business name is required for Pro Storefront status.', {}, 400);
+  }
+
+  // Handle uploaded document if any
+  let docPath = null;
+  if (req.file) {
+    docPath = 'uploads/' + req.file.filename;
+  } else if (req.body.id_document_data) {
+    const matches = req.body.id_document_data.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
+    if (matches) {
+      const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+      const filename = `kyc_${userId}_${crypto.randomBytes(6).toString('hex')}.${ext}`;
+      fs.writeFileSync(path.join(UPLOAD_DIR, filename), Buffer.from(matches[2], 'base64'));
+      docPath = 'uploads/' + filename;
+    }
+  }
+
+  // Insert or update pending KYC record
+  const insert = db.prepare(`
+    INSERT INTO kyc_verifications (
+      user_id, tier, full_name, phone, nin_bvn, id_type, id_document_path,
+      business_name, business_address, cac_number, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review')
+  `).run(
+    userId, tier, fullName, phone, ninBvn, idType, docPath,
+    businessName || null, businessAddress || null, cacNumber || null
+  );
+
+  // Update user's KYC status to pending review
+  db.prepare(`
+    UPDATE users
+    SET kyc_status = 'pending_review',
+        kyc_tier = ?,
+        nin_bvn = ?,
+        business_name = ?,
+        business_address = ?
+    WHERE id = ?
+  `).run(tier, ninBvn, businessName || null, businessAddress || null, userId);
+
+  // Notify user
+  createNotification(userId, 'KYC Submitted for Review', 'Your identity details and NIN have been submitted. An administrator will review your verification before listing is enabled.', 'kyc');
+
+  // Notify all admins
+  const admins = db.prepare('SELECT id FROM users WHERE is_admin = 1').all();
+  admins.forEach(adm => {
+    createNotification(adm.id, 'New KYC Verification Awaiting Review', `${fullName} submitted Tier ${tier} (${idType}) verification for review.`, 'kyc', '/admin?tab=kyc');
+  });
+
+  return sendJson(res, true, 'Verification submitted successfully! Our compliance desk will review your details shortly.', {
+    kyc_status: 'pending_review',
+    tier
+  }, 201);
+}
+
+function handleKycStatus(req, res) {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const user = db.prepare('SELECT id, full_name, kyc_status, kyc_tier, nin_bvn, is_admin FROM users WHERE id = ?').get(userId);
+  const latestVerification = db.prepare('SELECT * FROM kyc_verifications WHERE user_id = ? ORDER BY id DESC LIMIT 1').get(userId);
+
+  return sendJson(res, true, 'KYC status retrieved.', {
+    kyc_status: user.is_admin ? 'approved' : (user.kyc_status || 'unverified'),
+    kyc_tier: user.kyc_tier || 1,
+    is_admin: user.is_admin === 1,
+    can_list: user.is_admin === 1 || user.kyc_status === 'approved',
+    verification: latestVerification || null
+  });
+}
+
+function handleKycVerify(req, res) {
+  return handleKycSubmit(req, res);
 }
 
 function handleLogout(req, res) {
@@ -315,6 +485,17 @@ function handleCreateItem(req, res) {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
+  const user = db.prepare('SELECT id, is_admin, kyc_status, full_name FROM users WHERE id = ?').get(userId);
+  if (!user) return sendJson(res, false, 'User account not found.', {}, 404);
+
+  // Requirement 3: Until user's details, NIN and other verifications has been reviewed by an admin, they can't list
+  if (!user.is_admin && user.kyc_status !== 'approved') {
+    return sendJson(res, false, 'Identity Verification Required: Your details, NIN and verification documents must be reviewed and approved by an administrator before you can list items.', {
+      kyc_required: true,
+      kyc_status: user.kyc_status || 'unverified'
+    }, 403);
+  }
+
   const body = req.body || {};
   const title = (body.title || '').trim();
   const category = (body.category || '').trim();
@@ -385,22 +566,34 @@ function handleCreateItem(req, res) {
     receiptPath = 'uploads/' + req.files.receipt[0].filename;
   }
 
+  // Requirement 4: Listings done by users should be reviewed by an admin before it is live
+  const initialStatus = user.is_admin ? 'Active' : 'pending_review';
+
   const insert = db.prepare(`
     INSERT INTO items (
       user_id, title, category, mode, item_condition, location, wanted,
       est_value, pawn_advance, pawn_buyback, pawn_due_date, serial_imei,
-      receipt_path, image_path, gallery_json, description
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      receipt_path, image_path, gallery_json, description, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     userId, title, category, mode, condition, location, wanted,
     estValue, pawnAdvance, pawnBuyback, pawnDueDate, serialImei || null,
-    receiptPath, savedPaths[0], JSON.stringify(savedPaths), desc
+    receiptPath, savedPaths[0], JSON.stringify(savedPaths), desc, initialStatus
   );
 
   const itemId = Number(insert.lastInsertRowid);
-  console.log(`[Item] New item #${itemId} created by user #${userId}: ${title}`);
+  console.log(`[Item] New item #${itemId} (${initialStatus}) created by user #${userId}: ${title}`);
 
-  return sendJson(res, true, 'Item posted live to DFQ Trade Crow!', { item_id: itemId }, 201);
+  if (initialStatus === 'pending_review') {
+    createNotification(userId, 'Listing Awaiting Admin Approval', `Your listing "${title}" was submitted and is pending review by our compliance team before going live.`, 'listing');
+    const admins = db.prepare('SELECT id FROM users WHERE is_admin = 1').all();
+    admins.forEach(adm => {
+      createNotification(adm.id, 'New Listing Needs Review', `Trader ${user.full_name} submitted "${title}" for listing review.`, 'listing', '/admin?tab=listings');
+    });
+    return sendJson(res, true, 'Item submitted successfully! Your listing is pending administrative review before going live.', { item_id: itemId, status: 'pending_review' }, 201);
+  }
+
+  return sendJson(res, true, 'Item posted live to DFQ Trade Crow!', { item_id: itemId, status: 'Active' }, 201);
 }
 
 function handleBoostItem(req, res) {
@@ -838,24 +1031,153 @@ app.get('/api/admin/data', (req, res) => {
   const stats = {
     users: db.prepare('SELECT COUNT(*) as count FROM users').get().count,
     items: db.prepare('SELECT COUNT(*) as count FROM items').get().count,
+    pending_items: db.prepare(`SELECT COUNT(*) as count FROM items WHERE status = 'pending_review'`).get().count,
+    pending_kyc: db.prepare(`SELECT COUNT(*) as count FROM kyc_verifications WHERE status = 'pending_review'`).get().count,
     reported: db.prepare(`SELECT COUNT(*) as count FROM items WHERE is_reported = 1 AND status != 'Removed'`).get().count,
-    swapped: db.prepare(`SELECT COUNT(*) as count FROM items WHERE status = 'Swapped'`).get().count
+    swapped: db.prepare(`SELECT COUNT(*) as count FROM items WHERE status = 'Swapped'`).get().count,
+    active_swaps: db.prepare(`SELECT COUNT(*) as count FROM swap_offers WHERE status IN ('Pending', 'Countered', 'In Escrow')`).get().count
   };
 
   const allItems = db.prepare(`
-    SELECT i.*, u.full_name AS owner_name, u.email AS owner_email
+    SELECT i.*, u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
     FROM items i
     JOIN users u ON i.user_id = u.id
-    ORDER BY i.is_reported DESC, i.created_at DESC
+    ORDER BY (CASE WHEN i.status = 'pending_review' THEN 0 WHEN i.is_reported = 1 THEN 1 ELSE 2 END), i.created_at DESC
   `).all();
 
   const allUsers = db.prepare(`
-    SELECT id, full_name, email, phone, location, referral_code, spotlight_credits, is_admin, created_at
+    SELECT id, full_name, email, phone, location, referral_code, spotlight_credits, is_admin,
+           COALESCE(kyc_tier, 1) AS kyc_tier,
+           COALESCE(kyc_status, 'unverified') AS kyc_status,
+           COALESCE(email_verified, 0) AS email_verified,
+           nin_bvn, business_name, created_at
     FROM users
     ORDER BY created_at DESC
   `).all();
 
-  return sendJson(res, true, 'Admin data fetched.', { stats, allItems, allUsers });
+  const pendingKyc = db.prepare(`
+    SELECT k.*, u.email, u.location, u.created_at AS user_joined_at
+    FROM kyc_verifications k
+    JOIN users u ON k.user_id = u.id
+    WHERE k.status = 'pending_review'
+    ORDER BY k.created_at ASC
+  `).all();
+
+  const pendingItems = db.prepare(`
+    SELECT i.*, u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone,
+           COALESCE(u.kyc_tier, 1) AS owner_kyc_tier
+    FROM items i
+    JOIN users u ON i.user_id = u.id
+    WHERE i.status = 'pending_review'
+    ORDER BY i.created_at ASC
+  `).all();
+
+  const allOffers = db.prepare(`
+    SELECT o.*, i.title AS item_title, i.image_path AS item_image,
+           u1.full_name AS proposer_name, u1.phone AS proposer_phone,
+           u2.full_name AS owner_name, u2.phone AS owner_phone
+    FROM swap_offers o
+    JOIN items i ON o.item_id = i.id
+    JOIN users u1 ON o.proposer_id = u1.id
+    JOIN users u2 ON o.owner_id = u2.id
+    ORDER BY o.created_at DESC LIMIT 50
+  `).all();
+
+  return sendJson(res, true, 'Admin data fetched.', {
+    stats,
+    allItems,
+    allUsers,
+    pendingKyc,
+    pendingItems,
+    allOffers
+  });
+});
+
+// Admin Review: Approve / Reject KYC
+app.post('/api/admin/kyc/:id/approve', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const kycId = parseInt(req.params.id, 10);
+  const kyc = db.prepare('SELECT * FROM kyc_verifications WHERE id = ?').get(kycId);
+  if (!kyc) return sendJson(res, false, 'KYC submission not found.', {}, 404);
+
+  db.prepare(`UPDATE kyc_verifications SET status = 'approved', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?`).run(adminId, kycId);
+  db.prepare(`UPDATE users SET kyc_status = 'approved', kyc_tier = ? WHERE id = ?`).run(kyc.tier, kyc.user_id);
+
+  createNotification(
+    kyc.user_id,
+    'KYC Identity Verification Approved!',
+    `Congratulations! Your identity details and NIN have been approved by compliance. You now have the ${kyc.tier === 3 ? 'Gold Seal Merchant' : 'Blue Shield Trader'} badge and can post listings freely.`,
+    'kyc'
+  );
+
+  return sendJson(res, true, `KYC application #${kycId} approved successfully for ${kyc.full_name}!`);
+});
+
+app.post('/api/admin/kyc/:id/reject', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const kycId = parseInt(req.params.id, 10);
+  const reason = (req.body.reason || 'Information provided did not match official records.').trim();
+  const kyc = db.prepare('SELECT * FROM kyc_verifications WHERE id = ?').get(kycId);
+  if (!kyc) return sendJson(res, false, 'KYC submission not found.', {}, 404);
+
+  db.prepare(`UPDATE kyc_verifications SET status = 'rejected', rejection_reason = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?`).run(reason, adminId, kycId);
+  db.prepare(`UPDATE users SET kyc_status = 'rejected' WHERE id = ?`).run(kyc.user_id);
+
+  createNotification(
+    kyc.user_id,
+    'KYC Verification Requires Attention',
+    `Your identity verification was not approved. Reason: ${reason}. Please update your details and re-submit.`,
+    'kyc'
+  );
+
+  return sendJson(res, true, `KYC application #${kycId} rejected.`);
+});
+
+// Admin Review: Approve / Reject Listing
+app.post('/api/admin/items/:id/approve', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const itemId = parseInt(req.params.id, 10);
+  const item = db.prepare('SELECT id, user_id, title FROM items WHERE id = ?').get(itemId);
+  if (!item) return sendJson(res, false, 'Item not found.', {}, 404);
+
+  db.prepare(`UPDATE items SET status = 'Active', admin_review_notes = 'Approved' WHERE id = ?`).run(itemId);
+
+  createNotification(
+    item.user_id,
+    'Listing Approved & Live!',
+    `Great news! Your listing "${item.title}" has been reviewed by our compliance desk and is now live on the marketplace.`,
+    'listing',
+    `/item/${itemId}`
+  );
+
+  return sendJson(res, true, `Listing #${itemId} "${item.title}" is now approved and live on DFQ Trade Crow!`);
+});
+
+app.post('/api/admin/items/:id/reject', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const itemId = parseInt(req.params.id, 10);
+  const reason = (req.body.reason || 'Listing does not comply with community trade standards.').trim();
+  const item = db.prepare('SELECT id, user_id, title FROM items WHERE id = ?').get(itemId);
+  if (!item) return sendJson(res, false, 'Item not found.', {}, 404);
+
+  db.prepare(`UPDATE items SET status = 'rejected', admin_review_notes = ? WHERE id = ?`).run(reason, itemId);
+
+  createNotification(
+    item.user_id,
+    'Listing Rejected by Review Desk',
+    `Your listing "${item.title}" was rejected. Reason: ${reason}.`,
+    'listing'
+  );
+
+  return sendJson(res, true, `Listing #${itemId} rejected.`);
 });
 
 app.post('/api/admin/action', (req, res) => {
@@ -923,6 +1245,16 @@ function handleSendMessage(req, res) {
     INSERT INTO messages (item_id, sender_id, recipient_id, message)
     VALUES (?, ?, ?, ?)
   `).run(itemId, senderId, recipientId, messageText);
+
+  // Notify recipient of incoming message
+  const senderUser = db.prepare('SELECT full_name FROM users WHERE id = ?').get(senderId);
+  createNotification(
+    recipientId,
+    `New message from ${senderUser ? senderUser.full_name : 'Trader'}`,
+    `Regarding "${item.title}": ${messageText.length > 60 ? messageText.substring(0, 57) + '...' : messageText}`,
+    'chat',
+    `/chat?item_id=${itemId}&partner_id=${senderId}`
+  );
 
   return sendJson(res, true, 'Message sent successfully!', {
     message_id: Number(insert.lastInsertRowid),
@@ -1041,5 +1373,95 @@ app.post('/api/messages/send', handleSendMessage);
 app.get('/api/messages/thread', handleGetThread);
 app.get('/api/messages/conversations', handleGetConversations);
 app.get('/api/messages/unread-count', handleUnreadCount);
+
+// ==========================================
+// NOTIFICATIONS API
+// ==========================================
+function handleGetNotifications(req, res) {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const rows = db.prepare(`
+    SELECT * FROM notifications
+    WHERE user_id = ?
+    ORDER BY created_at DESC
+    LIMIT 50
+  `).all(userId);
+
+  const unreadCount = db.prepare(`
+    SELECT COUNT(*) as count FROM notifications
+    WHERE user_id = ? AND is_read = 0
+  `).get(userId).count;
+
+  return sendJson(res, true, 'Notifications fetched.', {
+    notifications: rows,
+    unread_count: unreadCount
+  });
+}
+
+function handleMarkNotificationRead(req, res) {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const notifId = parseInt(req.params.id, 10);
+  if (notifId) {
+    db.prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?').run(notifId, userId);
+  }
+
+  return sendJson(res, true, 'Notification marked as read.');
+}
+
+function handleMarkAllNotificationsRead(req, res) {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  db.prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ?').run(userId);
+  return sendJson(res, true, 'All notifications marked as read.');
+}
+
+// RESTful aliases for notifications
+app.get('/api/notifications', handleGetNotifications);
+app.post('/api/notifications/read-all', handleMarkAllNotificationsRead);
+app.post('/api/notifications/:id/read', handleMarkNotificationRead);
+
+// RESTful aliases for OTP
+app.post('/api/otp/send', handleSendOtp);
+app.post('/api/otp/verify', handleVerifyOtp);
+
+// RESTful aliases for KYC
+app.post('/api/kyc/submit', upload.single('id_document'), handleKycSubmit);
+app.get('/api/kyc/status', handleKycStatus);
+
+// Message notification enhancement in handleSendMessage
+// Also add REST aliases for admin items and kyc pending lists
+app.get('/api/admin/items/pending', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const items = db.prepare(`
+    SELECT i.*, u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
+    FROM items i
+    JOIN users u ON i.user_id = u.id
+    WHERE i.status = 'pending_review'
+    ORDER BY i.created_at ASC
+  `).all();
+
+  return sendJson(res, true, 'Pending items fetched.', { items });
+});
+
+app.get('/api/admin/kyc/pending', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const applications = db.prepare(`
+    SELECT k.*, u.email, u.location, u.created_at AS user_joined_at
+    FROM kyc_verifications k
+    JOIN users u ON k.user_id = u.id
+    WHERE k.status = 'pending_review'
+    ORDER BY k.created_at ASC
+  `).all();
+
+  return sendJson(res, true, 'Pending KYC applications fetched.', { applications });
+});
 
 module.exports = app;

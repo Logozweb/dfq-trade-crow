@@ -424,11 +424,10 @@ export default function PostWizardModal({ user, onClose, onSuccess }) {
                 type="button"
                 disabled={loading}
                 onClick={handleSubmit}
-                className="px-4 py-2 rounded-lg text-xs font-semibold text-white border-0 cursor-pointer shadow-sm flex items-center gap-1.5"
-                style={{ backgroundColor: 'var(--dfq-emerald)' }}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-white border-0 cursor-pointer shadow-sm flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 transition-colors"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{loading ? 'Publishing...' : 'Publish Listing'}</span>
+                <span>{loading ? 'Submitting...' : user?.is_admin === 1 ? 'Publish Live' : 'Submit for Admin Review'}</span>
               </button>
             )}
           </div>

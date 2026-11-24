@@ -107,6 +107,48 @@ function initSchema() {
       FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS otps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      code TEXT NOT NULL,
+      purpose TEXT DEFAULT 'registration',
+      candidate_name TEXT,
+      expires_at DATETIME NOT NULL,
+      used INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      type TEXT DEFAULT 'info',
+      link TEXT DEFAULT NULL,
+      is_read INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS kyc_verifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      tier INTEGER NOT NULL DEFAULT 2,
+      full_name TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      nin_bvn TEXT NOT NULL,
+      id_type TEXT DEFAULT 'NIN',
+      id_document_path TEXT,
+      business_name TEXT,
+      business_address TEXT,
+      cac_number TEXT,
+      status TEXT DEFAULT 'pending_review',
+      rejection_reason TEXT,
+      reviewed_by INTEGER,
+      reviewed_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
   `);
 
   // Safely ensure dual-OTP & escrow columns exist on swap_offers
@@ -119,13 +161,17 @@ function initSchema() {
   try { db.exec(`ALTER TABLE swap_offers ADD COLUMN offered_image TEXT;`); } catch (_) {}
   try { db.exec(`ALTER TABLE swap_offers ADD COLUMN decline_reason TEXT;`); } catch (_) {}
 
-  // Safely ensure tiered KYC columns exist on users
+  // Safely ensure tiered KYC & email verification columns exist on users
   try { db.exec(`ALTER TABLE users ADD COLUMN kyc_tier INTEGER DEFAULT 1;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN kyc_status TEXT DEFAULT 'unverified';`); } catch (_) {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0;`); } catch (_) {}
   try { db.exec(`ALTER TABLE users ADD COLUMN nin_bvn TEXT;`); } catch (_) {}
   try { db.exec(`ALTER TABLE users ADD COLUMN business_name TEXT;`); } catch (_) {}
   try { db.exec(`ALTER TABLE users ADD COLUMN business_address TEXT;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN avatar TEXT;`); } catch (_) {}
 
-  // Safely ensure pawn lifecycle & review tag columns exist
+  // Safely ensure admin review & pawn columns exist on items
+  try { db.exec(`ALTER TABLE items ADD COLUMN admin_review_notes TEXT;`); } catch (_) {}
   try { db.exec(`ALTER TABLE items ADD COLUMN is_liquidated INTEGER DEFAULT 0;`); } catch (_) {}
   try { db.exec(`ALTER TABLE items ADD COLUMN redeemed_at DATETIME;`); } catch (_) {}
   try { db.exec(`ALTER TABLE trader_reviews ADD COLUMN tags TEXT;`); } catch (_) {}
@@ -201,7 +247,72 @@ function initSchema() {
 
 initSchema();
 
+function createOtpInDb(email, candidateName = 'Trader', purpose = 'registration') {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  // 6-digit random code
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  // Expires in 15 minutes
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+  // Invalidate any existing unused OTPs for this email & purpose
+  db.prepare('UPDATE otps SET used = 1 WHERE email = ? AND purpose = ? AND used = 0').run(cleanEmail, purpose);
+
+  db.prepare(`
+    INSERT INTO otps (email, code, purpose, candidate_name, expires_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(cleanEmail, code, purpose, candidateName, expiresAt);
+
+  return { code, expiresAt, email: cleanEmail };
+}
+
+function verifyOtpInDb(email, code, purpose = 'registration') {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const cleanCode = String(code || '').trim();
+
+  const record = db.prepare(`
+    SELECT * FROM otps
+    WHERE email = ? AND code = ? AND purpose = ? AND used = 0
+    ORDER BY id DESC LIMIT 1
+  `).get(cleanEmail, cleanCode, purpose);
+
+  if (!record) {
+    return { success: false, error: 'Invalid verification code.' };
+  }
+
+  const now = new Date();
+  const expires = new Date(record.expires_at);
+  if (now > expires) {
+    return { success: false, error: 'Verification code has expired. Please request a new one.' };
+  }
+
+  // Mark as used
+  db.prepare('UPDATE otps SET used = 1 WHERE id = ?').run(record.id);
+
+  // If purpose is registration or email_verify, update users table
+  if (purpose === 'registration' || purpose === 'email_verify') {
+    db.prepare('UPDATE users SET email_verified = 1 WHERE email = ?').run(cleanEmail);
+  }
+
+  return { success: true, message: 'Email successfully verified!' };
+}
+
+function createNotification(userId, title, message, type = 'info', link = null) {
+  try {
+    const res = db.prepare(`
+      INSERT INTO notifications (user_id, title, message, type, link)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(userId, title, message, type, link);
+    return res.lastInsertRowid;
+  } catch (err) {
+    console.error('[Notification Error]', err);
+    return null;
+  }
+}
+
 module.exports = {
   db,
-  initSchema
+  initSchema,
+  createOtpInDb,
+  verifyOtpInDb,
+  createNotification
 };
