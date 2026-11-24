@@ -1,7 +1,9 @@
 import { resolve } from 'path';
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  plugins: [react()],
   server: {
     port: 3000,
     proxy: {
@@ -16,14 +18,11 @@ export default defineConfig({
     }
   },
   build: {
+    outDir: 'dist',
+    emptyOutDir: true,
     rollupOptions: {
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
-        dashboard: resolve(import.meta.dirname, 'dashboard.html'),
-        legal: resolve(import.meta.dirname, 'legal.html'),
-        trader: resolve(import.meta.dirname, 'trader.html'),
-        ticket: resolve(import.meta.dirname, 'ticket.html'),
-        admin: resolve(import.meta.dirname, 'admin.html'),
       }
     }
   }

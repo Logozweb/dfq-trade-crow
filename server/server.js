@@ -12,6 +12,7 @@ const rootDir = path.join(__dirname, '..');
 if (fs.existsSync(distDir)) {
   console.log('[Server] Serving production Vite build from dist/');
   app.use(express.static(distDir));
+  app.use('/assets', express.static(path.join(rootDir, 'assets')));
 } else {
   console.log('[Server] Serving static files from workspace root');
   app.use(express.static(rootDir));
