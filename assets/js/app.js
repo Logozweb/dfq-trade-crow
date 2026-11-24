@@ -1274,6 +1274,8 @@ function renderListings() {
     const hasReceipt = Boolean(item.receipt_path);
     const isFav = favIds.includes(Number(item.id));
     const ownerTier = Number(item.owner_kyc_tier || (item.owner_kyc_verified !== false ? 2 : 1));
+    const escrowTag = item.status === "In Escrow" ? `<span class="badge badge-escrow ms-1">Inspection Hold</span>` : "";
+    const spotlightTag = isFeatured ? `<span class="badge bg-sky-primary ms-1"><i class="bi bi-lightning-fill"></i> Spotlight</span>` : "";
     let kycBadgeHtml = "";
     if (ownerTier === 3) {
       kycBadgeHtml = `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1" title="Tier 3 Pro Storefront / Pawn Merchant"><i class="bi bi-award-fill"></i> Gold Seal Pro</span>`;
