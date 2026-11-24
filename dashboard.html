@@ -22,23 +22,26 @@
 </script>
 </head>
 <body>
-  <nav class="navbar navbar-expand-lg navbar-custom sticky-top py-2.5">
-    <div class="container">
-      <a class="navbar-brand d-flex align-items-center gap-2.5 fw-bold fs-4" href="index.html">
+  <nav class="navbar navbar-custom sticky-top">
+    <div class="container d-flex align-items-center justify-content-between">
+      <a class="navbar-brand d-flex align-items-center gap-2 mb-0" href="index.html">
         <span class="brand-logo-wrap">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 7L16 3M20 7L16 11M20 7H9C6.79086 7 5 8.79086 5 11V12" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M4 17L8 21M4 17L8 13M4 17H15C17.2091 17 19 15.2091 19 13V12" stroke="#E0F2FE" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M20 7L16 3M20 7L16 11M20 7H9C6.79086 7 5 8.79086 5 11V12" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 17L8 21M4 17L8 13M4 17H15C17.2091 17 19 15.2091 19 13V12" stroke="#BFDBFE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </span>
-        <span>DFQ <span class="text-sky">Trade Crow</span></span>
+        <span class="fw-bold fs-5 text-dark">DFQ <span class="text-primary">Trade Crow</span></span>
+        <span class="badge bg-light text-secondary border small fw-normal ms-1">Trade Desk</span>
       </a>
-      <div class="d-flex align-items-center gap-2 ms-auto">
-        <a href="#" id="myStorefrontLink" class="btn btn-light border btn-sm px-3 py-2 rounded-3 fw-semibold d-none"><i class="bi bi-shop-window text-sky me-1"></i> Public Storefront</a>
-        <a href="index.html" class="btn btn-outline-sky btn-sm px-3 py-2 rounded-3"><i class="bi bi-shop me-1"></i> Marketplace</a>
+      <div class="d-flex align-items-center gap-2">
+        <a href="index.html" class="btn btn-ghost-modern btn-sm"><i class="bi bi-grid-fill me-1"></i>Marketplace</a>
+        <a href="#" id="myStorefrontLink" class="btn btn-secondary-modern btn-sm d-none"><i class="bi bi-shop me-1"></i>My Storefront</a>
+        <button type="button" class="btn btn-ghost-modern nav-icon-btn" data-theme-toggle title="Toggle Dark / Light Theme">
+          <i class="bi bi-moon-stars"></i>
+        </button>
       </div>
-      <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-inline-flex align-items-center gap-1" data-theme-toggle title="Toggle Dark/Light Theme"><i class="bi bi-moon-stars-fill"></i><span class="theme-label d-none d-sm-inline">Dark</span></button>
-      </div>
+    </div>
   </nav>
 
   <header class="bg-white border-bottom py-4">
@@ -175,8 +178,11 @@
             <div class="mb-3">
               <label class="form-label fw-semibold small">Star Rating</label>
               <select class="form-select" id="rateScore">
-                <option value="5">5 ★ — Smooth &amp; Honest Swap</option><option value="4">4 ★ — Good Experience</option>
-                <option value="3">3 ★ — Average / Delayed Meetup</option><option value="2">2 ★ — Item Condition Differed</option><option value="1">1 ★ — Poor Experience</option>
+                <option value="5">5 Stars — Smooth &amp; Honest Swap</option>
+                <option value="4">4 Stars — Good Experience</option>
+                <option value="3">3 Stars — Average / Delayed Meetup</option>
+                <option value="2">2 Stars — Item Condition Differed</option>
+                <option value="1">1 Star — Poor Experience</option>
               </select>
             </div>
             <div class="mb-3">

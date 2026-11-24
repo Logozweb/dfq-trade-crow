@@ -606,7 +606,7 @@ window.confirmHandoverOtp = async function () {
 
     if (data.success) {
       bootstrap.Modal.getInstance(document.getElementById("otpHandoverModal"))?.hide();
-      showDashToast("🎉 Dual-OTP Handover Verified! Escrow released.");
+      showDashToast("Dual-OTP Handover Verified! Escrow released.");
       await loadDashboardData();
     } else {
       showDashToast(data.message || "Invalid code. Please try again.");

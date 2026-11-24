@@ -24,133 +24,135 @@
 </script>
 </head>
 <body>
-  <nav class="navbar navbar-custom sticky-top py-2.5">
-    <div class="container d-flex align-items-center justify-content-between gap-2">
-      <a class="navbar-brand d-flex align-items-center gap-2 fw-bold fs-4 mb-0" href="index.html">
+  <nav class="navbar navbar-custom sticky-top">
+    <div class="container d-flex align-items-center justify-content-between">
+      <!-- Left: Logo & Brand -->
+      <a class="navbar-brand d-flex align-items-center gap-2 mb-0" href="index.html">
         <span class="brand-logo-wrap">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 7L16 3M20 7L16 11M20 7H9C6.79086 7 5 8.79086 5 11V12" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M4 17L8 21M4 17L8 13M4 17H15C17.2091 17 19 15.2091 19 13V12" stroke="#E0F2FE" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M20 7L16 3M20 7L16 11M20 7H9C6.79086 7 5 8.79086 5 11V12" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 17L8 21M4 17L8 13M4 17H15C17.2091 17 19 15.2091 19 13V12" stroke="#BFDBFE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </span>
-        <span>DFQ <span class="text-sky">Trade Crow</span></span>
+        <span class="fw-bold fs-5 text-dark">DFQ <span class="text-primary">Trade Crow</span></span>
+        <span class="badge bg-light text-secondary border d-none d-lg-inline-block small fw-normal ms-1">Verified P2P</span>
       </a>
 
-      <div class="d-flex align-items-center gap-1.5 gap-sm-2 flex-wrap justify-content-end" id="mainNav">
-        <!-- Browse Marketplace Icon -->
-        <a href="#marketplace" class="btn btn-light border nav-icon-btn" data-bs-toggle="tooltip" title="Browse Marketplace" aria-label="Browse Marketplace">
-          <i class="bi bi-shop text-sky"></i>
+      <!-- Center: Clean Desktop Links -->
+      <div class="d-none d-md-flex align-items-center gap-1">
+        <a href="#marketplace" class="nav-link-modern active">
+          <i class="bi bi-grid-fill me-1.5 text-primary"></i>Marketplace
         </a>
+        <a href="dashboard.html" class="nav-link-modern">
+          <i class="bi bi-kanban me-1.5 text-secondary"></i>Trade Desk
+        </a>
+        <a href="#" class="nav-link-modern" data-bs-toggle="modal" data-bs-target="#serialCheckModal">
+          <i class="bi bi-qr-code-scan me-1.5 text-secondary"></i>Verify IMEI
+        </a>
+        <a href="legal.html" class="nav-link-modern">
+          <i class="bi bi-shield-check me-1.5 text-secondary"></i>Trust &amp; Escrow
+        </a>
+      </div>
 
-        <!-- Verify IMEI / Serial Icon -->
-        <button type="button" class="btn btn-light border nav-icon-btn" data-bs-toggle="modal" data-bs-target="#serialCheckModal" title="Verify Device Serial / IMEI" aria-label="Verify Device Serial / IMEI">
-          <i class="bi bi-qr-code-scan text-sky"></i>
+      <!-- Right: Actions, Auth & Utilities -->
+      <div class="d-flex align-items-center gap-2" id="mainNav">
+        <!-- Messages & Inquiries Drawer Trigger -->
+        <button type="button" class="btn btn-ghost-modern nav-icon-btn position-relative" id="btnOpenChatList" onclick="openConversationsList()" title="Inquiries & Messages" aria-label="Inquiries & Messages">
+          <i class="bi bi-chat-dots"></i>
+          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary d-none" id="navChatUnreadBadge" style="font-size:0.62rem;">0</span>
         </button>
 
-        <!-- Verify KYC / OTP Icon -->
-        <button type="button" id="btnOpenKycModal" class="btn btn-outline-success nav-icon-btn" onclick="openKycModal()" title="Verify KYC / Phone OTP" aria-label="Verify KYC / Phone OTP">
-          <i class="bi bi-patch-check-fill"></i>
-          <span id="kycNavText" class="visually-hidden">Verify KYC / OTP</span>
+        <!-- KYC Badge Button -->
+        <button type="button" id="btnOpenKycModal" class="btn btn-outline-success btn-sm rounded-pill fw-semibold px-2.5 py-1" onclick="openKycModal()" title="Trader Identity Verification">
+          <i class="bi bi-patch-check-fill me-1"></i>
+          <span id="kycNavText">Verify KYC</span>
         </button>
 
-        <!-- My Trade Desk Icon -->
-        <a href="dashboard.html" class="btn btn-light border nav-icon-btn" title="My Trade Desk" aria-label="My Trade Desk">
-          <i class="bi bi-kanban text-sky"></i>
-        </a>
-
-        <!-- Messages & Inquiries Icon -->
-        <button type="button" class="btn btn-light border nav-icon-btn position-relative" id="btnOpenChatList" onclick="openConversationsList()" title="Inquiries & Messages" aria-label="Inquiries & Messages">
-          <i class="bi bi-chat-dots-fill text-sky"></i>
-          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="navChatUnreadBadge" style="font-size:0.65rem;">0</span>
+        <!-- Post Listing CTA -->
+        <button type="button" class="btn btn-primary btn-sm fw-semibold rounded-pill px-3 shadow-xs" id="btnOpenPostModal">
+          <i class="bi bi-plus-lg me-1"></i>Post Listing
         </button>
 
-        <!-- Admin Icon (visible when logged in as admin) -->
-        <a href="admin.html" id="adminNavLink" class="btn btn-dark nav-icon-btn d-none" title="Admin Moderation Panel" aria-label="Admin Moderation Panel">
-          <i class="bi bi-shield-lock"></i>
+        <!-- Admin Portal (if admin) -->
+        <a href="admin.html" id="adminNavLink" class="btn btn-dark btn-sm rounded-pill d-none" title="Admin Moderation Panel">
+          <i class="bi bi-shield-lock me-1"></i>Admin
         </a>
 
-        <!-- Guest Login & Sign Up Icons -->
-        <div id="guestNavBtns" class="d-flex align-items-center gap-1.5 gap-sm-2">
-          <button type="button" class="btn btn-outline-sky nav-icon-btn" onclick="openAuthModal('login')" title="Log In" aria-label="Log In">
-            <i class="bi bi-box-arrow-in-right"></i>
-          </button>
-          <button type="button" class="btn btn-light border nav-icon-btn" onclick="openAuthModal('register')" title="Create Account (Sign Up)" aria-label="Create Account">
-            <i class="bi bi-person-plus-fill text-sky"></i>
-          </button>
+        <!-- Guest Auth Controls -->
+        <div id="guestNavBtns" class="d-flex align-items-center gap-1.5">
+          <button type="button" class="btn btn-ghost-modern btn-sm fw-semibold" onclick="openAuthModal('login')">Log In</button>
+          <button type="button" class="btn btn-light border btn-sm fw-semibold rounded-pill" onclick="openAuthModal('register')">Sign Up</button>
         </div>
 
-        <!-- Logged-In User Icon Pill + Logout Icon -->
+        <!-- Signed-In User Profile & Logout -->
         <div id="userNavBadge" class="d-none align-items-center gap-1.5">
-          <span class="badge bg-sky-light text-sky px-2.5 py-2 rounded-pill fw-semibold d-inline-flex align-items-center gap-1" id="navUserName" title="Signed-in Trader">
-            <i class="bi bi-person-check-fill"></i>
+          <span class="badge bg-light text-dark border px-2.5 py-1.5 rounded-pill fw-semibold d-inline-flex align-items-center gap-1" id="navUserName">
+            <i class="bi bi-person-check-fill text-primary"></i>
           </span>
-          <button type="button" class="btn btn-light border nav-icon-btn text-danger" id="btnLogout" title="Log Out" aria-label="Log Out">
+          <button type="button" class="btn btn-ghost-modern nav-icon-btn text-danger p-0" id="btnLogout" title="Log Out" aria-label="Log Out">
             <i class="bi bi-box-arrow-right"></i>
           </button>
         </div>
 
-        <!-- Post Item to Swap Icon -->
-        <button type="button" class="btn btn-sky nav-icon-btn" id="btnOpenPostModal" title="Post Item to Swap" aria-label="Post Item to Swap">
-          <i class="bi bi-plus-lg"></i>
-        </button>
-
-        <!-- Dark / Light Theme Icon -->
-        <button type="button" class="btn btn-light border nav-icon-btn" data-theme-toggle title="Toggle Dark / Light Theme" aria-label="Toggle Dark / Light Theme">
-          <i class="bi bi-moon-stars-fill"></i>
+        <!-- Dark / Light Theme Toggle -->
+        <button type="button" class="btn btn-ghost-modern nav-icon-btn" data-theme-toggle title="Toggle Dark / Light Theme" aria-label="Toggle Dark / Light Theme">
+          <i class="bi bi-moon-stars"></i>
         </button>
       </div>
     </div>
   </nav>
 
+  <!-- CRISP HERO SECTION (Turing-Inspired) -->
   <header class="hero-section">
-    <div class="hero-playful-bubbles" aria-hidden="true">
-      <div class="playful-bubble b1"><i class="bi bi-arrow-left-right"></i></div>
-      <div class="playful-bubble b2"><i class="bi bi-stars"></i></div>
-      <div class="playful-bubble b3"><i class="bi bi-controller"></i></div>
-      <div class="playful-bubble b4"><i class="bi bi-bicycle"></i></div>
-      <div class="playful-bubble b5"><i class="bi bi-heart-fill text-danger"></i></div>
-      <div class="playful-bubble b6"><i class="bi bi-shield-fill-check text-success"></i></div>
-    </div>
-    <div class="container">
-      <div class="row align-items-center g-4">
-        <div class="col-lg-8 mx-auto text-center">
-          <div class="hero-badge mb-3">
-            <i class="bi bi-shield-check"></i>
-            <span>Receipt-Verified Barter &bull; Digital Pawn Tickets &bull; Escrow Hold</span>
-          </div>
-          <h1 class="display-5 fw-extrabold mb-3" style="letter-spacing: -0.02em;">
-            Swap What You Have for <span class="text-sky">What You Need.</span>
-          </h1>
-          <p class="lead text-secondary mb-4 mx-auto" style="max-width: 640px; font-size: 1.08rem;">
-            Got a 3-seater couch and need a bed frame? Or looking to pawn electronics with a verifiable receipt? Post on <strong>DFQ Trade Crow</strong> and swap safely.
-          </p>
-          <div class="hero-search-box mx-auto text-start" style="max-width: 780px;">
-            <div class="row g-2 align-items-center">
-              <div class="col-md-6 border-end">
-                <div class="input-group">
-                  <span class="input-group-text bg-transparent border-0 text-sky"><i class="bi bi-search"></i></span>
-                  <input type="text" id="searchInput" class="form-control" placeholder="Search couch, bed, iPhone, or Serial/IMEI..." />
-                </div>
-              </div>
-              <div class="col-md-3 border-end">
-                <div class="input-group">
-                  <span class="input-group-text bg-transparent border-0 text-muted"><i class="bi bi-geo-alt-fill text-sky"></i></span>
-                  <select id="locationFilter" class="form-select">
-                    <option value="all">All Locations</option>
-                    <option value="Lekki, Lagos">Lekki, Lagos</option>
-                    <option value="Yaba, Lagos">Yaba, Lagos</option>
-                    <option value="Ikeja, Lagos">Ikeja, Lagos</option>
-                    <option value="Abuja">Abuja</option>
-                    <option value="Ota, Ogun">Ota, Ogun</option>
-                  </select>
-                </div>
-              </div>
-              <div class="col-md-3 d-grid">
-                <button type="button" id="btnSearchNow" class="btn btn-sky py-2.5 rounded-3">Find Trades</button>
-              </div>
+    <div class="container text-center">
+      <div class="hero-top-pill mb-3">
+        <i class="bi bi-shield-check"></i>
+        <span>Verified P2P Barter, Digital Pawn Tickets &amp; Escrow Hold</span>
+      </div>
+      <h1 class="hero-title mb-3">
+        Trade What You Have for <span class="text-primary">What You Need.</span>
+      </h1>
+      <p class="hero-subtitle mx-auto mb-4">
+        Exchange electronics, laptops, home appliances, or vehicles directly with verified traders. Access transparent 10% collateral advances backed by dual-OTP inspection hold.
+      </p>
+
+      <!-- Unified Elevated Search Console -->
+      <div class="hero-search-box mx-auto text-start mb-4" style="max-width: 820px;">
+        <div class="row g-2 align-items-center">
+          <div class="col-md-6 border-end">
+            <div class="d-flex align-items-center px-2">
+              <i class="bi bi-search text-muted me-2"></i>
+              <input type="text" id="searchInput" class="form-control" placeholder="Search gadgets, iPhone, MacBook, or Serial/IMEI..." />
             </div>
           </div>
+          <div class="col-md-3 border-end">
+            <div class="d-flex align-items-center px-2">
+              <i class="bi bi-geo-alt text-muted me-2"></i>
+              <select id="locationFilter" class="form-select">
+                <option value="all">All Locations</option>
+                <option value="Lekki, Lagos">Lekki, Lagos</option>
+                <option value="Yaba, Lagos">Yaba, Lagos</option>
+                <option value="Ikeja, Lagos">Ikeja, Lagos</option>
+                <option value="Abuja">Abuja</option>
+                <option value="Ota, Ogun">Ota, Ogun</option>
+              </select>
+            </div>
+          </div>
+          <div class="col-md-3 d-grid">
+            <button type="button" id="btnSearchNow" class="btn btn-primary py-2.5 rounded-3 fw-semibold">
+              <i class="bi bi-search me-1.5"></i> Find Trades
+            </button>
+          </div>
         </div>
+      </div>
+
+      <!-- Trust Metadata Bar -->
+      <div class="hero-trust-bar">
+        <span class="hero-trust-item"><i class="bi bi-shield-lock-fill text-primary"></i> 100% Escrow Hold Protected</span>
+        <span class="text-muted d-none d-sm-inline">&bull;</span>
+        <span class="hero-trust-item"><i class="bi bi-qr-code-scan text-primary"></i> Anti-Theft Serial / IMEI Screened</span>
+        <span class="text-muted d-none d-sm-inline">&bull;</span>
+        <span class="hero-trust-item"><i class="bi bi-calculator-fill text-primary"></i> 10% Fixed Buyback Guarantee</span>
       </div>
     </div>
   </header>

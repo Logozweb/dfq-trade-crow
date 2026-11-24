@@ -18,13 +18,22 @@
   </script>
 </head>
 <body>
-  <nav class="navbar bg-white border-bottom py-3">
+  <nav class="navbar navbar-custom sticky-top">
     <div class="container d-flex justify-content-between align-items-center">
-      <a class="navbar-brand fw-bold" href="index.html">DFQ <span class="text-sky">Trade Crow</span></a>
+      <a class="navbar-brand d-flex align-items-center gap-2 mb-0" href="index.html">
+        <span class="brand-logo-wrap">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M20 7L16 3M20 7L16 11M20 7H9C6.79086 7 5 8.79086 5 11V12" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 17L8 21M4 17L8 13M4 17H15C17.2091 17 19 15.2091 19 13V12" stroke="#BFDBFE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="fw-bold fs-5 text-dark">DFQ <span class="text-primary">Trade Crow</span></span>
+        <span class="badge bg-light text-secondary border small fw-normal ms-1">Storefront</span>
+      </a>
       <div class="d-flex align-items-center gap-2">
-        <a href="index.html" class="btn btn-outline-sky btn-sm">Back to Marketplace</a>
-        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-inline-flex align-items-center gap-1" data-theme-toggle title="Toggle Dark/Light Theme">
-          <i class="bi bi-moon-stars-fill"></i><span class="theme-label d-none d-sm-inline">Dark</span>
+        <a href="index.html" class="btn btn-ghost-modern btn-sm"><i class="bi bi-arrow-left me-1"></i>Marketplace</a>
+        <button type="button" class="btn btn-ghost-modern nav-icon-btn" data-theme-toggle title="Toggle Dark / Light Theme">
+          <i class="bi bi-moon-stars"></i>
         </button>
       </div>
     </div>
@@ -97,7 +106,7 @@
               <div class="bg-white border rounded-4 p-3 shadow-sm">
                 <div class="d-flex justify-content-between">
                   <strong class="text-dark small">${r.reviewer_name}</strong>
-                  <span class="text-warning small fw-bold">${'★'.repeat(Math.max(1, Math.min(5, r.rating)))}</span>
+                  <span class="text-warning small">${Array.from({length: Math.max(1, Math.min(5, r.rating))}).map(() => '<i class="bi bi-star-fill"></i>').join('')}</span>
                 </div>
                 <p class="small text-secondary mb-0 mt-1">${r.comment || 'Verified Trade Transaction'}</p>
                 ${tagsHtml}

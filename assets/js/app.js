@@ -1286,10 +1286,10 @@ function renderListings() {
     const col = document.createElement("div");
     col.className = "col-md-6 col-lg-4";
     col.innerHTML = `
-      <article class="item-card ${isFeatured ? "featured-card" : ""}" style="animation-delay: ${Math.min(idx * 45, 450)}ms;">
-        <div class="item-img-wrap">
+      <article class="item-card ${isFeatured ? "featured-card" : ""}">
+        <div class="item-img-wrap cursor-pointer" onclick="openDetails(${item.id})">
           <img src="${item.image_path}" alt="${item.title}" loading="lazy" onerror="this.src='assets/img/couch.svg'" />
-          <button type="button" class="btn-fav-heart ${isFav ? "is-favorited" : ""}" onclick="toggleFavoriteItem(${item.id}, this)" title="Save to Favorites Watchlist" aria-label="Save to Favorites">
+          <button type="button" class="btn-fav-heart ${isFav ? "is-favorited" : ""}" onclick="event.stopPropagation(); toggleFavoriteItem(${item.id}, this)" title="Save to Favorites" aria-label="Save to Favorites">
             <i class="bi ${isFav ? "bi-heart-fill" : "bi-heart"}"></i>
           </button>
           <span class="badge-trade-type ${getBadgeClass(item.mode)}">${item.mode}</span>
@@ -1299,28 +1299,29 @@ function renderListings() {
         </div>
         <div class="p-3.5 p-4 d-flex flex-column flex-grow-1">
           <div class="d-flex justify-content-between align-items-center text-muted small mb-1 flex-wrap gap-1">
-            <span><i class="bi bi-geo-alt-fill text-sky me-1"></i>${item.location}${kycBadgeHtml}</span>
-            <a href="trader.html?id=${item.user_id}" class="text-decoration-none text-warning-emphasis fw-semibold">
-              <i class="bi bi-star-fill text-warning me-1"></i>${item.owner_rating} (${item.review_count})
+            <span class="d-inline-flex align-items-center"><i class="bi bi-geo-alt text-muted me-1"></i>${item.location}${kycBadgeHtml}</span>
+            <a href="trader.html?id=${item.user_id}" class="text-decoration-none text-muted small fw-semibold">
+              <i class="bi bi-star-fill text-warning me-1"></i>${item.owner_rating} <span class="text-secondary">(${item.review_count})</span>
             </a>
           </div>
-          <h5 class="fw-bold mb-2 text-dark">${item.title} ${spotlightTag} ${escrowTag}</h5>
-          <p class="small text-secondary mb-3 flex-grow-1">${item.description}</p>
+          <h5 class="fw-bold mb-2 text-dark" style="cursor:pointer;" onclick="openDetails(${item.id})">${item.title} ${spotlightTag} ${escrowTag}</h5>
+          <p class="small text-secondary mb-3 flex-grow-1" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${item.description}</p>
           <div class="exchange-box mb-3">
-            <span class="exchange-label"><i class="bi bi-arrow-left-right me-1"></i>Looking For in Return</span>
+            <span class="exchange-label"><i class="bi bi-arrow-left-right me-1"></i>Desired Exchange</span>
             <div class="exchange-value">${item.wanted}</div>
           </div>
-          <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+          <div class="d-flex justify-content-between align-items-center pt-2.5 border-top">
             <div>
-              <span class="d-block text-muted" style="font-size: 0.72rem;">Est. Value</span>
+              <span class="d-block text-muted" style="font-size: 0.72rem; font-weight:500;">Est. Value</span>
               <span class="fw-bold text-dark">${formatNaira(item.est_value)}</span>
             </div>
             <div class="d-flex gap-1.5 align-items-center">
-              <button type="button" class="btn btn-light border btn-sm px-2 text-sky" onclick="openInquiryDrawer(${item.id})" title="Chat / Inquire with Trader" aria-label="Chat with Trader">
-                <i class="bi bi-chat-dots-fill"></i>
+              <button type="button" class="btn btn-secondary-modern btn-sm px-2.5" onclick="openInquiryDrawer(${item.id})" title="Chat / Inquire with Trader">
+                <i class="bi bi-chat-text me-1"></i>Inquire
               </button>
-              <button type="button" class="btn btn-outline-sky btn-sm px-2.5" onclick="openDetails(${item.id})">Details</button>
-              <button type="button" class="btn btn-sky btn-sm px-3" onclick="openSwapModal(${item.id})">Propose Swap</button>
+              <button type="button" class="btn btn-primary btn-sm px-3" onclick="openSwapModal(${item.id})">
+                <i class="bi bi-arrow-left-right me-1"></i>Swap
+              </button>
             </div>
           </div>
         </div>
