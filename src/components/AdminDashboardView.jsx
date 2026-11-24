@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldAlert, ShieldCheck, CheckCircle2, XCircle, Clock, Users,
   Package, ArrowLeftRight, Coins, AlertTriangle, Eye, EyeOff, Search,
   RefreshCw, Check, X, ExternalLink, Filter, Mail, Send, Server, Key,
-  Inbox, Database, CheckCircle
+  Inbox, Database, CheckCircle, Trash2, Edit3, Lock, Unlock, Sparkles,
+  Ban, Shield
 } from 'lucide-react';
+import Pagination from './Pagination';
+import AdminEditUserModal from './AdminEditUserModal';
+import AdminEditItemModal from './AdminEditItemModal';
 
 export default function AdminDashboardView({ onBackToMarketplace }) {
   const [activeTab, setActiveTab] = useState('kyc'); // 'kyc', 'listings', 'email_dispatcher', 'users', 'swaps', 'all_items'
@@ -14,11 +18,26 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
   const [toast, setToast] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [traderSearchQuery, setTraderSearchQuery] = useState('');
+
+  // Pagination States (Requirement 4)
+  const [kycPage, setKycPage] = useState(1);
+  const [listingApprovalPage, setListingApprovalPage] = useState(1);
+  const [allItemsPage, setAllItemsPage] = useState(1);
+  const [tradersPage, setTradersPage] = useState(1);
+  const [swapsPage, setSwapsPage] = useState(1);
+  const [outboxPage, setOutboxPage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  // Modals for Editing (Requirement 1 & 2)
+  const [editingUser, setEditingUser] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
 
   // Email Dispatcher State
+  const [saveResult, setSaveResult] = useState(null);
   const [emailSettings, setEmailSettings] = useState({
     provider: 'smtp',
-    smtp: { host: 'smtp.gmail.com', port: '587', secure: false, user: '', pass: '', senderName: 'DFQ Trade Crow Security' },
+    smtp: { host: 'smtp.gmail.com', port: '587', secure: false, user: '', pass: '', senderName: 'DFQ Trade Crow Security', rejectUnauthorized: false },
     resendApiKey: '',
     senderName: 'DFQ Trade Crow Security',
     senderEmail: 'no-reply@dfqtradecrow.com',
@@ -63,7 +82,7 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
   const fetchEmailOutbox = async () => {
     setOutboxLoading(true);
     try {
-      const res = await fetch('/api/admin/email-outbox');
+      const res = await fetch('/api/admin/email-outbox?limit=200');
       const json = await res.json();
       setOutboxLoading(false);
       const logs = json.logs || json.data?.logs;
@@ -89,6 +108,7 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
   const handleSaveEmailSettings = async (e) => {
     if (e) e.preventDefault();
     setEmailSaving(true);
+    setSaveResult(null);
     try {
       const res = await fetch('/api/admin/email-settings', {
         method: 'POST',
@@ -98,15 +118,16 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
       const json = await res.json();
       setEmailSaving(false);
       if (json.success) {
+        setSaveResult({ success: true, message: 'Dispatcher configuration saved successfully!' });
         showToast('Email dispatcher settings saved successfully!');
         const s = json.settings || json.data?.settings;
         if (s) setEmailSettings(s);
       } else {
-        alert(json.message || 'Failed to save settings.');
+        setSaveResult({ success: false, message: json.message || 'Failed to save configuration.' });
       }
     } catch (err) {
       setEmailSaving(false);
-      alert(`Error saving email settings: ${err.message || 'Network request failed'}`);
+      setSaveResult({ success: false, message: `Error saving email settings: ${err.message || 'Network request failed'}` });
     }
   };
 
@@ -238,6 +259,127 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
     }
   };
 
+  // Requirement 1: User Management Actions (Delete, Block/Unblock)
+  const handleDeleteUser = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to permanently delete trader "${name}" (#${id}) and all their listings? This action cannot be reversed.`)) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      setActionLoading(false);
+      if (json.success) {
+        showToast(json.message);
+        fetchAdminData();
+      } else {
+        alert(json.message || 'Failed to delete user.');
+      }
+    } catch (_) {
+      setActionLoading(false);
+      alert('Error deleting user.');
+    }
+  };
+
+  const handleToggleBlockUser = async (user) => {
+    const isCurrentlyBlocked = user.is_blocked === 1;
+    let reason = '';
+    if (!isCurrentlyBlocked) {
+      reason = window.prompt(`Enter suspension reason for "${user.full_name}":`, 'Suspicious activity or community guidelines violation');
+      if (reason === null) return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/block`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ block: !isCurrentlyBlocked, reason })
+      });
+      const json = await res.json();
+      setActionLoading(false);
+      if (json.success) {
+        showToast(json.message);
+        fetchAdminData();
+      } else {
+        alert(json.message || 'Failed to toggle block status.');
+      }
+    } catch (_) {
+      setActionLoading(false);
+      alert('Error updating user block status.');
+    }
+  };
+
+  // Requirement 2: Listing Management Actions (Delete, Spotlight Toggle)
+  const handleDeleteItem = async (id, title) => {
+    if (!window.confirm(`Are you sure you want to permanently delete listing "${title}" (#${id})?`)) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/admin/items/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      setActionLoading(false);
+      if (json.success) {
+        showToast(json.message);
+        fetchAdminData();
+      } else {
+        alert(json.message || 'Failed to delete listing.');
+      }
+    } catch (_) {
+      setActionLoading(false);
+      alert('Error deleting listing.');
+    }
+  };
+
+  const handleToggleSpotlight = async (id) => {
+    try {
+      const res = await fetch(`/api/admin/items/${id}/toggle-spotlight`, { method: 'POST' });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message);
+        fetchAdminData();
+      } else {
+        alert(json.message || 'Failed to toggle spotlight.');
+      }
+    } catch (_) {
+      alert('Error updating spotlight status.');
+    }
+  };
+
+  // Requirement 3: OTP Dispatch Log Actions (Delete Single & Clear All)
+  const handleDeleteOutboxLog = async (id) => {
+    try {
+      const res = await fetch(`/api/admin/email-outbox/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (json.success) {
+        showToast('Dispatch log entry removed.');
+        fetchEmailOutbox();
+      } else {
+        alert(json.message || 'Failed to delete log entry.');
+      }
+    } catch (_) {
+      alert('Error deleting dispatch log.');
+    }
+  };
+
+  const handleClearOutboxLogs = async () => {
+    if (!window.confirm('Are you sure you want to clear all outbound email dispatch history?')) {
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/email-outbox/clear', { method: 'POST' });
+      const json = await res.json();
+      if (json.success) {
+        showToast('All dispatch logs cleared.');
+        fetchEmailOutbox();
+      } else {
+        alert(json.message || 'Failed to clear logs.');
+      }
+    } catch (_) {
+      alert('Error clearing dispatch logs.');
+    }
+  };
+
   // Generic admin action (remove item, restore, add credits, toggle admin)
   const handleGenericAction = async (act, id, extra = {}) => {
     setActionLoading(true);
@@ -268,8 +410,91 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
   const allItems = data?.allItems || [];
   const allOffers = data?.allOffers || [];
 
+  // Filtered & Paginated Traders (Requirement 4)
+  const filteredUsers = useMemo(() => {
+    if (!traderSearchQuery.trim()) return allUsers;
+    const q = traderSearchQuery.toLowerCase();
+    return allUsers.filter(u =>
+      (u.full_name || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q) ||
+      (u.phone || '').toLowerCase().includes(q) ||
+      (u.location || '').toLowerCase().includes(q) ||
+      (u.referral_code || '').toLowerCase().includes(q)
+    );
+  }, [allUsers, traderSearchQuery]);
+
+  const paginatedUsers = useMemo(() => {
+    const start = (tradersPage - 1) * PAGE_SIZE;
+    return filteredUsers.slice(start, start + PAGE_SIZE);
+  }, [filteredUsers, tradersPage]);
+
+  // Filtered & Paginated Listings (Requirement 4)
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return allItems;
+    const q = searchQuery.toLowerCase();
+    return allItems.filter(it =>
+      (it.title || '').toLowerCase().includes(q) ||
+      (it.owner_name || '').toLowerCase().includes(q) ||
+      (it.wanted || '').toLowerCase().includes(q) ||
+      (it.serial_imei || '').toLowerCase().includes(q)
+    );
+  }, [allItems, searchQuery]);
+
+  const paginatedAllItems = useMemo(() => {
+    const start = (allItemsPage - 1) * PAGE_SIZE;
+    return filteredItems.slice(start, start + PAGE_SIZE);
+  }, [filteredItems, allItemsPage]);
+
+  // Paginated Pending KYC (Requirement 4)
+  const paginatedPendingKyc = useMemo(() => {
+    const start = (kycPage - 1) * PAGE_SIZE;
+    return pendingKyc.slice(start, start + PAGE_SIZE);
+  }, [pendingKyc, kycPage]);
+
+  // Paginated Pending Items (Requirement 4)
+  const paginatedPendingItems = useMemo(() => {
+    const start = (listingApprovalPage - 1) * PAGE_SIZE;
+    return pendingItems.slice(start, start + PAGE_SIZE);
+  }, [pendingItems, listingApprovalPage]);
+
+  // Paginated Swaps (Requirement 4)
+  const paginatedSwaps = useMemo(() => {
+    const start = (swapsPage - 1) * PAGE_SIZE;
+    return allOffers.slice(start, start + PAGE_SIZE);
+  }, [allOffers, swapsPage]);
+
+  // Paginated Outbox Logs (Requirement 4)
+  const paginatedOutboxLogs = useMemo(() => {
+    const start = (outboxPage - 1) * PAGE_SIZE;
+    return outboxLogs.slice(start, start + PAGE_SIZE);
+  }, [outboxLogs, outboxPage]);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      {/* Edit User Modal */}
+      {editingUser && (
+        <AdminEditUserModal
+          user={editingUser}
+          onClose={() => setEditingUser(null)}
+          onSaved={(msg) => {
+            showToast(msg);
+            fetchAdminData();
+          }}
+        />
+      )}
+
+      {/* Edit Item Modal */}
+      {editingItem && (
+        <AdminEditItemModal
+          item={editingItem}
+          onClose={() => setEditingItem(null)}
+          onSaved={(msg) => {
+            showToast(msg);
+            fetchAdminData();
+          }}
+        />
+      )}
+
       {/* Top Breadcrumb & Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
         <div>
@@ -307,92 +532,50 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
         </div>
       </div>
 
-      {/* Toast Alert */}
+      {/* Global Admin Toast */}
       {toast && (
-        <div className="mt-4 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-medium flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-          <span>{toast}</span>
+        <div className="mt-4 p-3.5 rounded-xl bg-slate-900 dark:bg-slate-800 text-white text-xs shadow-lg flex items-center justify-between border border-slate-700 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>{toast}</span>
+          </div>
+          <button onClick={() => setToast('')} className="text-slate-400 hover:text-white border-0 bg-transparent cursor-pointer font-bold">&times;</button>
         </div>
       )}
 
-      {error && (
-        <div className="mt-4 p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400 text-xs font-medium">
-          {error}
-        </div>
-      )}
-
-      {/* KPI Stats Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 my-6">
+      {/* Summary Metric Counters */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 my-6">
         <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <Users className="w-3.5 h-3.5 text-slate-400" />
-            <span>Total Traders</span>
-          </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">{stats.users || 0}</div>
+          <div className="text-[11px] font-medium text-slate-500">Total Traders</div>
+          <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">{stats.users ?? 0}</div>
         </div>
-
-        <div className="p-4 rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/50 dark:bg-amber-950/20">
-          <div className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-amber-500" />
-            <span>Pending KYC</span>
-          </div>
-          <div className="text-2xl font-bold text-amber-800 dark:text-amber-300 mt-1.5 flex items-center gap-2">
-            <span>{stats.pending_kyc || 0}</span>
-            {stats.pending_kyc > 0 && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100">
-                Action Req.
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl border border-sky-200 dark:border-sky-900/60 bg-sky-50/50 dark:bg-sky-950/20">
-          <div className="text-[11px] font-semibold text-sky-700 dark:text-sky-400 flex items-center gap-1.5">
-            <Package className="w-3.5 h-3.5 text-sky-500" />
-            <span>Pending Listings</span>
-          </div>
-          <div className="text-2xl font-bold text-sky-800 dark:text-sky-300 mt-1.5 flex items-center gap-2">
-            <span>{stats.pending_items || 0}</span>
-            {stats.pending_items > 0 && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-sky-200 dark:bg-sky-800 text-sky-900 dark:text-sky-100">
-                Awaiting
-              </span>
-            )}
-          </div>
-        </div>
-
         <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Active Listings</span>
-          </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">
-            {(stats.items || 0) - (stats.pending_items || 0)}
-          </div>
+          <div className="text-[11px] font-medium text-amber-600">Pending KYC</div>
+          <div className="text-xl font-bold text-amber-600 mt-1">{pendingKyc.length}</div>
         </div>
-
         <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <ArrowLeftRight className="w-3.5 h-3.5 text-purple-500" />
-            <span>Active Swaps</span>
-          </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">{stats.active_swaps || 0}</div>
+          <div className="text-[11px] font-medium text-sky-600">Pending Listings</div>
+          <div className="text-xl font-bold text-sky-600 mt-1">{pendingItems.length} awaiting</div>
         </div>
-
         <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-            <span>Reported Flags</span>
-          </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1.5">{stats.reported || 0}</div>
+          <div className="text-[11px] font-medium text-emerald-600">Active Listings</div>
+          <div className="text-xl font-bold text-emerald-600 mt-1">{allItems.filter(i => i.status === 'Active').length}</div>
+        </div>
+        <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div className="text-[11px] font-medium text-purple-600">Active Swaps</div>
+          <div className="text-xl font-bold text-purple-600 mt-1">{stats.active_swaps ?? 0}</div>
+        </div>
+        <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div className="text-[11px] font-medium text-rose-600">Reported Flags</div>
+          <div className="text-xl font-bold text-rose-600 mt-1">{stats.reported ?? 0}</div>
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-4 mb-6 overflow-x-auto text-xs font-semibold">
         <button
           onClick={() => setActiveTab('kyc')}
-          className={`px-3.5 py-2 rounded-xl border-0 cursor-pointer flex items-center gap-2 transition-all ${
+          className={`px-3.5 py-2 rounded-xl border-0 cursor-pointer flex items-center gap-2 transition-all whitespace-nowrap ${
             activeTab === 'kyc'
               ? 'bg-sky-600 text-white shadow-sm'
               : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -409,7 +592,7 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
 
         <button
           onClick={() => setActiveTab('listings')}
-          className={`px-3.5 py-2 rounded-xl border-0 cursor-pointer flex items-center gap-2 transition-all ${
+          className={`px-3.5 py-2 rounded-xl border-0 cursor-pointer flex items-center gap-2 transition-all whitespace-nowrap ${
             activeTab === 'listings'
               ? 'bg-sky-600 text-white shadow-sm'
               : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -426,7 +609,7 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
 
         <button
           onClick={() => setActiveTab('all_items')}
-          className={`px-3.5 py-2 rounded-xl border-0 cursor-pointer flex items-center gap-1.5 transition-all ${
+          className={`px-3.5 py-2 rounded-xl border-0 cursor-pointer flex items-center gap-1.5 transition-all whitespace-nowrap ${
             activeTab === 'all_items'
               ? 'bg-sky-600 text-white shadow-sm'
               : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -438,7 +621,7 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
 
         <button
           onClick={() => setActiveTab('users')}
-          className={`px-3.5 py-2 rounded-xl border-0 cursor-pointer flex items-center gap-1.5 transition-all ${
+          className={`px-3.5 py-2 rounded-xl border-0 cursor-pointer flex items-center gap-1.5 transition-all whitespace-nowrap ${
             activeTab === 'users'
               ? 'bg-sky-600 text-white shadow-sm'
               : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -450,7 +633,7 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
 
         <button
           onClick={() => setActiveTab('swaps')}
-          className={`px-3.5 py-2 rounded-xl border-0 cursor-pointer flex items-center gap-1.5 transition-all ${
+          className={`px-3.5 py-2 rounded-xl border-0 cursor-pointer flex items-center gap-1.5 transition-all whitespace-nowrap ${
             activeTab === 'swaps'
               ? 'bg-sky-600 text-white shadow-sm'
               : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -462,7 +645,7 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
 
         <button
           onClick={() => setActiveTab('email_dispatcher')}
-          className={`px-3.5 py-2 rounded-xl border-0 cursor-pointer flex items-center gap-1.5 transition-all ${
+          className={`px-3.5 py-2 rounded-xl border-0 cursor-pointer flex items-center gap-1.5 transition-all whitespace-nowrap ${
             activeTab === 'email_dispatcher'
               ? 'bg-sky-600 text-white shadow-sm'
               : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -507,7 +690,7 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {pendingKyc.map((k) => (
+                  {paginatedPendingKyc.map((k) => (
                     <tr key={k.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                       <td className="py-3.5 px-4">
                         <div className="font-bold text-slate-900 dark:text-white">{k.full_name}</div>
@@ -565,6 +748,13 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                   ))}
                 </tbody>
               </table>
+              <Pagination
+                currentPage={kycPage}
+                totalItems={pendingKyc.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setKycPage}
+                itemLabel="applications"
+              />
             </div>
           )}
         </div>
@@ -591,92 +781,108 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pendingItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex flex-col justify-between shadow-xs"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
-                        Pending Admin Review
-                      </span>
-                      <span className="text-[11px] font-mono text-slate-400">#{item.id}</span>
-                    </div>
-
-                    <div className="aspect-video w-full rounded-xl bg-slate-100 dark:bg-slate-800 overflow-hidden mb-3">
-                      <img
-                        src={item.image_path}
-                        alt={item.title}
-                        className="w-full h-full object-cover"
-                        onError={(e) => { e.currentTarget.src = 'assets/img/phone.svg'; }}
-                      />
-                    </div>
-
-                    <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-1">{item.title}</h3>
-                    <div className="text-[11px] text-slate-500 mb-2">
-                      Owner: <strong>{item.owner_name}</strong> ({item.location})
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs space-y-1 mb-3">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Mode:</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">{item.mode}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Estimated Value:</span>
-                        <span className="font-bold text-sky-600 dark:text-sky-400">
-                          ₦{Number(item.est_value || 0).toLocaleString()}
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {paginatedPendingItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex flex-col justify-between shadow-xs"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
+                          Pending Admin Review
                         </span>
+                        <span className="text-[11px] font-mono text-slate-400">#{item.id}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Wanted:</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[160px]">
-                          {item.wanted}
-                        </span>
+
+                      <div className="aspect-video w-full rounded-xl bg-slate-100 dark:bg-slate-800 overflow-hidden mb-3">
+                        <img
+                          src={item.image_path}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.src = 'assets/img/phone.svg'; }}
+                        />
                       </div>
-                      {item.serial_imei && (
-                        <div className="flex justify-between pt-1 border-t border-slate-200 dark:border-slate-700">
-                          <span className="text-slate-500">Serial/IMEI:</span>
-                          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                            {item.serial_imei}
+
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-1">{item.title}</h3>
+                      <div className="text-[11px] text-slate-500 mb-2">
+                        Owner: <strong>{item.owner_name}</strong> ({item.location})
+                      </div>
+
+                      <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs space-y-1 mb-3">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Mode:</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">{item.mode}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Estimated Value:</span>
+                          <span className="font-bold text-sky-600 dark:text-sky-400">
+                            ₦{Number(item.est_value || 0).toLocaleString()}
                           </span>
                         </div>
-                      )}
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Wanted:</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[160px]">
+                            {item.wanted}
+                          </span>
+                        </div>
+                        {item.serial_imei && (
+                          <div className="flex justify-between pt-1 border-t border-slate-200 dark:border-slate-700">
+                            <span className="text-slate-500">Serial/IMEI:</span>
+                            <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                              {item.serial_imei}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 line-clamp-2 mb-3">
+                        {item.description}
+                      </p>
                     </div>
 
-                    <p className="text-[11px] text-slate-600 dark:text-slate-400 line-clamp-2 mb-3">
-                      {item.description}
-                    </p>
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        onClick={() => handleApproveItem(item.id, item.title)}
+                        disabled={actionLoading}
+                        className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs border-0 cursor-pointer shadow-xs flex items-center justify-center gap-1 transition-colors"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Approve & Publish</span>
+                      </button>
+                      <button
+                        onClick={() => setEditingItem(item)}
+                        className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-0 cursor-pointer"
+                        title="Edit Details Before Approving"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleRejectItem(item.id, item.title)}
+                        disabled={actionLoading}
+                        className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-red-50 hover:text-red-600 dark:bg-slate-800 dark:hover:bg-red-950/50 text-slate-600 dark:text-slate-400 font-semibold text-xs border-0 cursor-pointer transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Reject</span>
+                      </button>
+                    </div>
                   </div>
-
-                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                    <button
-                      onClick={() => handleApproveItem(item.id, item.title)}
-                      disabled={actionLoading}
-                      className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs border-0 cursor-pointer shadow-xs flex items-center justify-center gap-1 transition-colors"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Approve & Publish</span>
-                    </button>
-                    <button
-                      onClick={() => handleRejectItem(item.id, item.title)}
-                      disabled={actionLoading}
-                      className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-red-50 hover:text-red-600 dark:bg-slate-800 dark:hover:bg-red-950/50 text-slate-600 dark:text-slate-400 font-semibold text-xs border-0 cursor-pointer transition-colors"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      <span>Reject</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              <Pagination
+                currentPage={listingApprovalPage}
+                totalItems={pendingItems.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setListingApprovalPage}
+                itemLabel="listings"
+              />
+            </>
           )}
         </div>
       )}
 
-      {/* Tab 3: All Listings & Moderation */}
+      {/* Tab 3: All Listings & Moderation (Requirement 2 & 4) */}
       {activeTab === 'all_items' && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -689,7 +895,7 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                 type="text"
                 placeholder="Search listings..."
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={e => { setSearchQuery(e.target.value); setAllItemsPage(1); }}
                 className="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none"
               />
             </div>
@@ -708,84 +914,132 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {allItems
-                  .filter(it => !searchQuery || it.title.toLowerCase().includes(searchQuery.toLowerCase()) || (it.owner_name && it.owner_name.toLowerCase().includes(searchQuery.toLowerCase())))
-                  .map(it => (
-                    <tr key={it.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                          <span>{it.title}</span>
-                          {it.is_featured === 1 && (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
-                              Featured
-                            </span>
-                          )}
-                          {it.is_reported === 1 && (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">
-                              Reported Flag
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-slate-400">ID #{it.id} • {it.location}</div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-800 dark:text-slate-200">{it.owner_name}</div>
-                        <div className="text-[11px] text-slate-400">{it.owner_email}</div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="font-medium text-slate-700 dark:text-slate-300">{it.category}</div>
-                        <div className="text-[10px] text-slate-400">{it.mode}</div>
-                      </td>
-                      <td className="py-3 px-4 font-bold text-sky-600 dark:text-sky-400">
-                        ₦{Number(it.est_value || 0).toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          it.status === 'Active'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                            : it.status === 'pending_review'
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                            : it.status === 'Swapped'
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
-                            : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
-                        }`}>
-                          {it.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {it.status === 'Active' ? (
-                            <button
-                              onClick={() => handleGenericAction('remove_item', it.id)}
-                              className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 border-0 cursor-pointer"
-                            >
-                              Hide
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleGenericAction('restore_item', it.id)}
-                              className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 border-0 cursor-pointer"
-                            >
-                              Restore
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                {paginatedAllItems.map(it => (
+                  <tr key={it.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                    <td className="py-3 px-4">
+                      <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span>{it.title}</span>
+                        {it.is_featured === 1 && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 flex items-center gap-0.5">
+                            <Sparkles className="w-2.5 h-2.5" />
+                            Spotlight
+                          </span>
+                        )}
+                        {it.is_reported === 1 && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">
+                            Flagged
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-400">ID #{it.id} • {it.location}</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="font-semibold text-slate-800 dark:text-slate-200">{it.owner_name}</div>
+                      <div className="text-[11px] text-slate-400">{it.owner_email}</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="font-medium text-slate-700 dark:text-slate-300 capitalize">{it.category}</div>
+                      <div className="text-[10px] text-slate-400">{it.mode}</div>
+                    </td>
+                    <td className="py-3 px-4 font-bold text-sky-600 dark:text-sky-400">
+                      ₦{Number(it.est_value || 0).toLocaleString()}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        it.status === 'Active'
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                          : it.status === 'pending_review'
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                          : it.status === 'Swapped'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                          : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                      }`}>
+                        {it.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* Requirement 2: Edit Listing */}
+                        <button
+                          onClick={() => setEditingItem(it)}
+                          className="p-1.5 rounded-lg text-slate-600 hover:text-sky-600 hover:bg-sky-50 dark:text-slate-400 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 bg-transparent cursor-pointer transition-colors"
+                          title="Edit Listing Details"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Requirement 2: Spotlight Toggle */}
+                        <button
+                          onClick={() => handleToggleSpotlight(it.id)}
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                            it.is_featured === 1
+                              ? 'bg-amber-50 text-amber-600 border-amber-300 dark:bg-amber-950/50 dark:border-amber-800'
+                              : 'bg-transparent text-slate-400 border-slate-200 dark:border-slate-700 hover:text-amber-500'
+                          }`}
+                          title={it.is_featured === 1 ? 'Remove Spotlight Boost' : 'Boost to Spotlight'}
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Hide / Restore */}
+                        {it.status === 'Active' ? (
+                          <button
+                            onClick={() => handleGenericAction('remove_item', it.id)}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 border-0 cursor-pointer"
+                          >
+                            Hide
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleGenericAction('restore_item', it.id)}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 border-0 cursor-pointer"
+                          >
+                            Restore
+                          </button>
+                        )}
+
+                        {/* Requirement 2: Delete Listing */}
+                        <button
+                          onClick={() => handleDeleteItem(it.id, it.title)}
+                          className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 border border-red-200 dark:border-red-900/60 bg-transparent cursor-pointer transition-colors"
+                          title="Permanently Delete Listing"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
+            <Pagination
+              currentPage={allItemsPage}
+              totalItems={filteredItems.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setAllItemsPage}
+              itemLabel="listings"
+            />
           </div>
         </div>
       )}
 
-      {/* Tab 4: Traders Directory */}
+      {/* Tab 4: Traders Directory (Requirement 1 & 4) */}
       {activeTab === 'users' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-base font-bold text-slate-900 dark:text-white">
               Registered Traders Directory ({allUsers.length})
             </h2>
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Search traders by name, email, location..."
+                value={traderSearchQuery}
+                onChange={e => { setTraderSearchQuery(e.target.value); setTradersPage(1); }}
+                className="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none w-64"
+              />
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
@@ -793,31 +1047,46 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
               <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold">
                 <tr>
                   <th className="py-3 px-4">Trader</th>
-                  <th className="py-3 px-4">KYC Status</th>
+                  <th className="py-3 px-4">Status & KYC</th>
                   <th className="py-3 px-4">Role</th>
                   <th className="py-3 px-4">Spotlight Boosts</th>
                   <th className="py-3 px-4">Referral Code</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3 px-4 text-right">Manage Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {allUsers.map((u) => (
+                {paginatedUsers.map((u) => (
                   <tr key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                     <td className="py-3 px-4">
-                      <div className="font-bold text-slate-900 dark:text-white">{u.full_name}</div>
+                      <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <span>{u.full_name}</span>
+                        {u.is_blocked === 1 && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">
+                            Blocked
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] text-slate-400">{u.email} • {u.phone}</div>
+                      <div className="text-[10px] text-slate-400">{u.location}</div>
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        u.kyc_status === 'approved'
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                          : u.kyc_status === 'pending_review'
-                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                      }`}>
-                        <ShieldCheck className="w-3 h-3" />
-                        <span className="capitalize">{u.kyc_status} (Tier {u.kyc_tier || 1})</span>
-                      </span>
+                      <div className="space-y-1">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          u.kyc_status === 'approved'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                            : u.kyc_status === 'pending_review'
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                        }`}>
+                          <ShieldCheck className="w-3 h-3" />
+                          <span className="capitalize">{u.kyc_status} (Tier {u.kyc_tier || 1})</span>
+                        </span>
+                        {u.is_blocked === 1 && (
+                          <div className="text-[10px] text-red-600 dark:text-red-400 italic">
+                            Suspended: {u.blocked_reason || 'Policy issue'}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3 px-4">
                       {u.is_admin === 1 ? (
@@ -836,17 +1105,44 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {/* Requirement 1: Edit Details */}
+                        <button
+                          onClick={() => setEditingUser(u)}
+                          className="p-1.5 rounded-lg text-slate-600 hover:text-sky-600 hover:bg-sky-50 dark:text-slate-400 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 bg-transparent cursor-pointer transition-colors"
+                          title="Edit Trader Details"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Requirement 1: Block / Unblock User */}
+                        <button
+                          onClick={() => handleToggleBlockUser(u)}
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                            u.is_blocked === 1
+                              ? 'bg-emerald-50 text-emerald-600 border-emerald-300 dark:bg-emerald-950/40 dark:border-emerald-800'
+                              : 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/40 dark:border-red-900/60'
+                          }`}
+                          title={u.is_blocked === 1 ? 'Unblock Account' : 'Block & Suspend Account'}
+                        >
+                          {u.is_blocked === 1 ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {/* Quick Boost */}
                         <button
                           onClick={() => handleGenericAction('add_credits', u.id, { credits: 5 })}
-                          className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-sky-50 text-sky-700 hover:bg-sky-100 dark:bg-sky-950/40 dark:text-sky-300 border-0 cursor-pointer"
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-sky-50 text-sky-700 hover:bg-sky-100 dark:bg-sky-950/40 dark:text-sky-300 border border-sky-200 dark:border-sky-800/80 cursor-pointer"
+                          title="Grant 5 Free Spotlight Credits"
                         >
-                          +5 Boosts
+                          +5
                         </button>
+
+                        {/* Requirement 1: Delete Trader */}
                         <button
-                          onClick={() => handleGenericAction('toggle_admin', u.id)}
-                          className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-0 cursor-pointer"
+                          onClick={() => handleDeleteUser(u.id, u.full_name)}
+                          className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 border border-red-200 dark:border-red-900/60 bg-transparent cursor-pointer transition-colors"
+                          title="Permanently Delete Trader"
                         >
-                          {u.is_admin === 1 ? 'Demote' : 'Make Admin'}
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -854,11 +1150,18 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              currentPage={tradersPage}
+              totalItems={filteredUsers.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setTradersPage}
+              itemLabel="traders"
+            />
           </div>
         </div>
       )}
 
-      {/* Tab 5: Escrow & Barter Deals */}
+      {/* Tab 5: Escrow & Barter Deals (Requirement 4) */}
       {activeTab === 'swaps' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -880,303 +1183,342 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {allOffers.map((o) => (
+                {paginatedSwaps.map((o) => (
                   <tr key={o.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                     <td className="py-3 px-4">
-                      <div className="font-bold text-slate-900 dark:text-white">Offer #{o.id}</div>
-                      <div className="text-[11px] text-slate-400">{o.item_title}</div>
+                      <div className="font-bold text-slate-900 dark:text-white">{o.item_title}</div>
+                      <div className="text-[11px] text-slate-400">Deal Ref: #{o.id}</div>
                     </td>
                     <td className="py-3 px-4">
-                      <div><span className="text-slate-400">Proposer:</span> <strong className="text-slate-800 dark:text-slate-200">{o.proposer_name}</strong></div>
-                      <div><span className="text-slate-400">Owner:</span> <strong className="text-slate-800 dark:text-slate-200">{o.owner_name}</strong></div>
+                      <div className="text-slate-800 dark:text-slate-200">
+                        Proposer: <strong>{o.proposer_name}</strong>
+                      </div>
+                      <div className="text-slate-500 text-[11px]">
+                        Owner: <strong>{o.owner_name}</strong>
+                      </div>
                     </td>
-                    <td className="py-3 px-4 font-medium text-slate-700 dark:text-slate-300">
-                      {o.offered_item}
+                    <td className="py-3 px-4">
+                      <div className="font-medium text-slate-800 dark:text-slate-200">{o.offered_item}</div>
+                      {o.note && <div className="text-[10px] text-slate-400 italic">"{o.note}"</div>}
                     </td>
-                    <td className="py-3 px-4 font-bold text-sky-600 dark:text-sky-400">
-                      {o.cash_topup}
+                    <td className="py-3 px-4">
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                        {o.cash_topup || '₦0 (Straight Swap)'}
+                      </span>
                     </td>
                     <td className="py-3 px-4">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        o.status === 'Accepted'
+                        o.status === 'Completed'
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                          : o.status === 'In Escrow'
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
-                          : o.status === 'Countered'
+                          : o.status === 'Accepted' || o.status === 'In Escrow'
+                          ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
+                          : o.status === 'Pending'
                           ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                          : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                       }`}>
                         {o.status}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-xs font-mono">
-                      {o.status === 'In Escrow' ? (
-                        <span className="text-sky-600 font-bold">Awaiting Dual-OTP at Meetup Hub</span>
-                      ) : o.status === 'Accepted' ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600 font-bold">
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Dual-OTP Verified &amp; Released</span>
-                        </span>
+                    <td className="py-3 px-4 font-mono text-[11px]">
+                      {o.proposer_otp && o.owner_otp ? (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Dual OTPs Active</span>
                       ) : (
-                        <span className="text-slate-400">Not in Escrow</span>
+                        <span className="text-slate-400">Awaiting Handshake</span>
                       )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <Pagination
+              currentPage={swapsPage}
+              totalItems={allOffers.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setSwapsPage}
+              itemLabel="deals"
+            />
           </div>
         </div>
       )}
 
-      {/* Tab 6: Email Dispatcher Configuration */}
+      {/* Tab 6: Email Dispatcher Hub & Outbox Logs (Requirement 3 & 4) */}
       {activeTab === 'email_dispatcher' && (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2">
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Mail className="w-5 h-5 text-sky-500" />
-                <span>Email Dispatcher &amp; SMTP Configuration</span>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-1">
+                <Mail className="w-4 h-4 text-sky-500" />
+                <span>Outbound Mail Transport & OTP Delivery Settings</span>
               </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Configure platform outbound email routing for registration OTPs, KYC decisions, and trade notifications.
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-0">
+                Configure your SMTP server, sender identity, and test outbound OTP and alert emails.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${
-                emailSettings.provider === 'smtp' && emailSettings.smtp?.user
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300'
-                  : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
-              }`}>
-                <Server className="w-3.5 h-3.5" />
-                <span>
-                  {emailSettings.provider === 'smtp' && emailSettings.smtp?.user ? 'Live SMTP Transport' : 'Simulated / Dev Dispatch'}
-                </span>
-              </span>
-              <button
-                onClick={() => { fetchEmailSettings(); fetchEmailOutbox(); }}
-                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 cursor-pointer"
-                title="Refresh Dispatcher"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <button
+              onClick={fetchEmailSettings}
+              className="text-xs text-slate-600 dark:text-slate-400 hover:text-sky-600 flex items-center gap-1.5 self-start sm:self-auto bg-transparent border-0 cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Reload Current Settings</span>
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left 7 cols: Transport Settings Form */}
-            <div className="lg:col-span-7 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Server className="w-4 h-4 text-sky-500" />
-                <span>Outbound Mail Transport</span>
-              </h3>
-
-              {/* Provider Selection */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                  Select Dispatch Provider
-                </label>
-                <div className="grid grid-cols-3 gap-2.5">
-                  {[
-                    { id: 'smtp', label: 'Custom SMTP', desc: 'Gmail, Mailgun, Brevo, AWS' },
-                    { id: 'resend', label: 'Resend API', desc: 'Direct REST API key' },
-                    { id: 'simulated', label: 'Dev / Mock', desc: 'Simulated for testing' }
-                  ].map(p => (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left 2 Cols: Form */}
+            <div className="lg:col-span-2 space-y-5">
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                    Active Email Delivery Engine
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <button
-                      key={p.id}
                       type="button"
-                      onClick={() => setEmailSettings(prev => ({ ...prev, provider: p.id }))}
+                      onClick={() => setEmailSettings(prev => ({ ...prev, provider: 'smtp' }))}
                       className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
-                        emailSettings.provider === p.id
-                          ? 'border-sky-500 bg-sky-50/50 dark:bg-sky-950/40 text-sky-900 dark:text-sky-200 ring-2 ring-sky-500/20'
-                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
+                        emailSettings.provider === 'smtp'
+                          ? 'border-sky-500 bg-sky-50/60 dark:bg-sky-950/40 text-sky-900 dark:text-sky-200 ring-2 ring-sky-500/20'
+                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300'
                       }`}
                     >
-                      <div className="font-bold text-xs">{p.label}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">{p.desc}</div>
+                      <div className="flex items-center gap-2 font-bold text-xs mb-1">
+                        <Server className="w-4 h-4 text-sky-600" />
+                        <span>Custom SMTP</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 m-0">
+                        Gmail, Brevo, Mailgun, Amazon SES or cPanel.
+                      </p>
                     </button>
-                  ))}
-                </div>
-              </div>
 
-              {/* SMTP Settings Fields */}
-              {emailSettings.provider === 'smtp' && (
-                <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                        SMTP Host Server
-                      </label>
-                      <input
-                        type="text"
-                        value={emailSettings.smtp?.host || ''}
-                        onChange={(e) => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, host: e.target.value } }))}
-                        placeholder="smtp.gmail.com"
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                        SMTP Port
-                      </label>
-                      <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEmailSettings(prev => ({ ...prev, provider: 'resend' }))}
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                        emailSettings.provider === 'resend'
+                          ? 'border-sky-500 bg-sky-50/60 dark:bg-sky-950/40 text-sky-900 dark:text-sky-200 ring-2 ring-sky-500/20'
+                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 font-bold text-xs mb-1">
+                        <Key className="w-4 h-4 text-indigo-600" />
+                        <span>Resend API</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 m-0">
+                        Modern transactional email service with API key.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEmailSettings(prev => ({ ...prev, provider: 'dev_mock' }))}
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                        emailSettings.provider === 'dev_mock'
+                          ? 'border-sky-500 bg-sky-50/60 dark:bg-sky-950/40 text-sky-900 dark:text-sky-200 ring-2 ring-sky-500/20'
+                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 font-bold text-xs mb-1">
+                        <Database className="w-4 h-4 text-emerald-600" />
+                        <span>Simulated (Dev)</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 m-0">
+                        Mock delivery without real outbound dispatch.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* SMTP Credentials Form */}
+                {emailSettings.provider === 'smtp' && (
+                  <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                          SMTP Host Server
+                        </label>
                         <input
                           type="text"
-                          value={emailSettings.smtp?.port || ''}
-                          onChange={(e) => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, port: e.target.value } }))}
-                          placeholder="587"
+                          value={emailSettings.smtp?.host || ''}
+                          onChange={(e) => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, host: e.target.value } }))}
+                          placeholder="e.g. mail.pauladisa.com or smtp.gmail.com"
                           className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
                         />
-                        <button
-                          type="button"
-                          onClick={() => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, secure: !prev.smtp?.secure } }))}
-                          className={`px-3 py-2 rounded-xl border text-[11px] font-semibold cursor-pointer shrink-0 ${
-                            emailSettings.smtp?.secure
-                              ? 'bg-sky-50 text-sky-700 border-sky-300 dark:bg-sky-950 dark:text-sky-300'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          {emailSettings.smtp?.secure ? 'SSL (465)' : 'TLS (587)'}
-                        </button>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                          SMTP Port
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={emailSettings.smtp?.port || ''}
+                            onChange={(e) => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, port: e.target.value } }))}
+                            placeholder="587"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, secure: !prev.smtp?.secure } }))}
+                            className={`px-3 py-2 rounded-xl border text-[11px] font-semibold cursor-pointer shrink-0 ${
+                              emailSettings.smtp?.secure
+                                ? 'bg-sky-50 text-sky-700 border-sky-300 dark:bg-sky-950 dark:text-sky-300'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            {emailSettings.smtp?.secure ? 'SSL (465)' : 'TLS (587)'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
+                        <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700 dark:text-slate-200">
+                          <input
+                            type="checkbox"
+                            checked={emailSettings.smtp?.rejectUnauthorized !== true}
+                            onChange={(e) => setEmailSettings(prev => ({
+                              ...prev,
+                              smtp: { ...prev.smtp, rejectUnauthorized: !e.target.checked }
+                            }))}
+                            className="rounded border-slate-300 text-sky-600 focus:ring-sky-500 w-4 h-4 cursor-pointer"
+                          />
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">
+                            Allow Shared-Host / cPanel SSL (Bypasses TLS Certificate Name Mismatch)
+                          </span>
+                        </label>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 pl-6 leading-relaxed mb-0">
+                          Required when connecting to shared hosting mail servers (e.g. <code>mail.pauladisa.com</code> whose server certificate is issued to <code>*.web-hosting.com</code>).
+                        </p>
                       </div>
                     </div>
 
-                    <div className="sm:col-span-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
-                      <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700 dark:text-slate-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                          SMTP Username / Email
+                        </label>
                         <input
-                          type="checkbox"
-                          checked={emailSettings.smtp?.rejectUnauthorized !== true}
-                          onChange={(e) => setEmailSettings(prev => ({
-                            ...prev,
-                            smtp: { ...prev.smtp, rejectUnauthorized: !e.target.checked }
-                          }))}
-                          className="rounded border-slate-300 text-sky-600 focus:ring-sky-500 w-4 h-4"
+                          type="text"
+                          value={emailSettings.smtp?.user || ''}
+                          onChange={(e) => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, user: e.target.value } }))}
+                          placeholder="e.g. security@pauladisa.com"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
                         />
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">
-                          Allow Shared-Host / cPanel SSL (Bypasses TLS Certificate Name Mismatch)
-                        </span>
-                      </label>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 pl-6 leading-relaxed mb-0">
-                        Required when connecting to shared hosting mail servers (e.g. <code>mail.pauladisa.com</code> whose server certificate is issued to <code>*.web-hosting.com</code>).
-                      </p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                          SMTP Password / App Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPass ? 'text' : 'password'}
+                            value={emailSettings.smtp?.pass || ''}
+                            onChange={(e) => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, pass: e.target.value } }))}
+                            placeholder="Password or App secret"
+                            className="w-full pl-3 pr-9 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPass(!showPass)}
+                            className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 bg-transparent border-0 cursor-pointer p-0"
+                          >
+                            {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                )}
 
+                {/* Resend API Key Field */}
+                {emailSettings.provider === 'resend' && (
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                      Resend API Key
+                    </label>
+                    <input
+                      type="password"
+                      value={emailSettings.resendApiKey || ''}
+                      onChange={(e) => setEmailSettings(prev => ({ ...prev, resendApiKey: e.target.value }))}
+                      placeholder="re_1234567890abcdef..."
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                    />
+                  </div>
+                )}
+
+                {/* Sender Identity Section */}
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">
+                    Sender Identity Branding
+                  </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                        SMTP Username / Email
+                      <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
+                        From Display Name
                       </label>
                       <input
                         type="text"
-                        value={emailSettings.smtp?.user || ''}
-                        onChange={(e) => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, user: e.target.value } }))}
-                        placeholder="your-email@gmail.com"
+                        value={emailSettings.senderName || ''}
+                        onChange={(e) => setEmailSettings(prev => ({ ...prev, senderName: e.target.value }))}
+                        placeholder="DFQ Trade Crow Security"
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                        SMTP Password / App Password
+                      <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
+                        From Email Address
                       </label>
-                      <div className="relative">
-                        <input
-                          type={showPass ? 'text' : 'password'}
-                          value={emailSettings.smtp?.pass || ''}
-                          onChange={(e) => setEmailSettings(prev => ({ ...prev, smtp: { ...prev.smtp, pass: e.target.value } }))}
-                          placeholder="App Password or API secret"
-                          className="w-full pl-3 pr-9 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPass(!showPass)}
-                          className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 bg-transparent border-0 cursor-pointer p-0"
-                        >
-                          {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
+                      <input
+                        type="email"
+                        value={emailSettings.senderEmail || ''}
+                        onChange={(e) => setEmailSettings(prev => ({ ...prev, senderEmail: e.target.value }))}
+                        placeholder="no-reply@dfqtradecrow.com"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
+                      />
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* Resend API Key Field */}
-              {emailSettings.provider === 'resend' && (
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                    Resend API Key
-                  </label>
-                  <input
-                    type="password"
-                    value={emailSettings.resendApiKey || ''}
-                    onChange={(e) => setEmailSettings(prev => ({ ...prev, resendApiKey: e.target.value }))}
-                    placeholder="re_1234567890abcdef..."
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
-                  />
-                </div>
-              )}
-
-              {/* Sender Identity Section */}
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
-                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">
-                  Sender Identity Branding
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
-                      From Display Name
+                      Default OTP Subject Line
                     </label>
                     <input
                       type="text"
-                      value={emailSettings.senderName || ''}
-                      onChange={(e) => setEmailSettings(prev => ({ ...prev, senderName: e.target.value }))}
-                      placeholder="DFQ Trade Crow Security"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
-                      From Email Address
-                    </label>
-                    <input
-                      type="email"
-                      value={emailSettings.senderEmail || ''}
-                      onChange={(e) => setEmailSettings(prev => ({ ...prev, senderEmail: e.target.value }))}
-                      placeholder="no-reply@dfqtradecrow.com"
+                      value={emailSettings.subjectLine || ''}
+                      onChange={(e) => setEmailSettings(prev => ({ ...prev, subjectLine: e.target.value }))}
+                      placeholder="DFQ Trade Crow - Your Verification Code"
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
-                    Default OTP Subject Line
-                  </label>
-                  <input
-                    type="text"
-                    value={emailSettings.subjectLine || ''}
-                    onChange={(e) => setEmailSettings(prev => ({ ...prev, subjectLine: e.target.value }))}
-                    placeholder="DFQ Trade Crow - Your Verification Code"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
-                  />
+                <div className="pt-2 flex flex-col gap-2">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={emailSaving}
+                      onClick={handleSaveEmailSettings}
+                      className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs border-0 cursor-pointer shadow-sm shadow-sky-600/20 disabled:opacity-50 transition-all flex items-center gap-2"
+                    >
+                      {emailSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                      <span>Save Dispatcher Configuration</span>
+                    </button>
+                  </div>
+                  {saveResult && (
+                    <div className={`p-3 rounded-xl text-xs flex items-center gap-2 border ${
+                      saveResult.success
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60'
+                        : 'bg-red-50 text-red-800 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/60'
+                    }`}>
+                      {saveResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> : <XCircle className="w-4 h-4 text-red-500 shrink-0" />}
+                      <span>{saveResult.message}</span>
+                    </div>
+                  )}
                 </div>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="button"
-                  disabled={emailSaving}
-                  onClick={handleSaveEmailSettings}
-                  className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs border-0 cursor-pointer shadow-sm shadow-sky-600/20 disabled:opacity-50 transition-all flex items-center gap-2"
-                >
-                  {emailSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  <span>Save Dispatcher Configuration</span>
-                </button>
               </div>
             </div>
 
-            {/* Right 5 cols: Live SMTP Test & Outbox */}
-            <div className="lg:col-span-5 space-y-6">
+            {/* Right 1 Col: Test Email Handshake & Dispatch Log */}
+            <div className="space-y-5">
               {/* Test Email Card */}
               <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1224,20 +1566,32 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                 </div>
               </div>
 
-              {/* Outbox Activity Card */}
+              {/* Requirement 3: Outbox Activity Card with Delete & Clear All */}
               <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Inbox className="w-4 h-4 text-sky-500" />
-                    <span>Recent Dispatch Log</span>
+                    <span>Recent Dispatch Log ({outboxLogs.length})</span>
                   </h3>
-                  <button
-                    onClick={fetchEmailOutbox}
-                    className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 bg-transparent border-0 cursor-pointer hover:underline flex items-center gap-1"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${outboxLoading ? 'animate-spin' : ''}`} />
-                    <span>Refresh</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {outboxLogs.length > 0 && (
+                      <button
+                        onClick={handleClearOutboxLogs}
+                        className="text-[11px] font-semibold text-red-500 hover:text-red-600 bg-transparent border-0 cursor-pointer flex items-center gap-1"
+                        title="Delete all logs"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Clear All</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={fetchEmailOutbox}
+                      className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 bg-transparent border-0 cursor-pointer hover:underline flex items-center gap-1"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${outboxLoading ? 'animate-spin' : ''}`} />
+                      <span>Refresh</span>
+                    </button>
+                  </div>
                 </div>
 
                 {outboxLogs.length === 0 ? (
@@ -1245,28 +1599,50 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                     No outbound emails logged yet.
                   </div>
                 ) : (
-                  <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
-                    {outboxLogs.slice(0, 10).map((log) => (
-                      <div key={log.id} className="p-3 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-800/40 text-xs">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <strong className="text-slate-900 dark:text-white font-medium truncate">{log.recipient_email}</strong>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            log.status === 'delivered'
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                              : log.status === 'simulated'
-                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                              : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
-                          }`}>
-                            {log.status}
-                          </span>
+                  <>
+                    <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                      {paginatedOutboxLogs.map((log) => (
+                        <div key={log.id} className="p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-800/40 text-xs flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <strong className="text-slate-900 dark:text-white font-medium truncate">{log.recipient_email}</strong>
+                              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                                log.status === 'delivered'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                  : log.status === 'simulated'
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                  : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                              }`}>
+                                {log.status}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                              <span className="truncate">{log.subject || 'OTP Code'}</span>
+                              <span className="font-mono text-[10px] shrink-0 pl-2">
+                                {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          </div>
+                          {/* Requirement 3: Delete single outbox log */}
+                          <button
+                            onClick={() => handleDeleteOutboxLog(log.id)}
+                            className="p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 border-0 bg-transparent cursor-pointer transition-colors shrink-0"
+                            title="Delete log entry"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                          <span>{log.subject || 'OTP Code'}</span>
-                          <span className="font-mono text-[10px]">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                    {/* Requirement 4: Paginate outbox logs */}
+                    <Pagination
+                      currentPage={outboxPage}
+                      totalItems={outboxLogs.length}
+                      pageSize={PAGE_SIZE}
+                      onPageChange={setOutboxPage}
+                      itemLabel="logs"
+                    />
+                  </>
                 )}
               </div>
             </div>

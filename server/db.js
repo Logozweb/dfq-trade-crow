@@ -192,6 +192,8 @@ function initSchema() {
   try { db.exec(`ALTER TABLE users ADD COLUMN business_name TEXT;`); } catch (_) {}
   try { db.exec(`ALTER TABLE users ADD COLUMN business_address TEXT;`); } catch (_) {}
   try { db.exec(`ALTER TABLE users ADD COLUMN avatar TEXT;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN is_blocked INTEGER DEFAULT 0;`); } catch (_) {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN blocked_reason TEXT;`); } catch (_) {}
 
   // Safely ensure admin review & pawn columns exist on items
   try { db.exec(`ALTER TABLE items ADD COLUMN admin_review_notes TEXT;`); } catch (_) {}
@@ -406,7 +408,7 @@ function saveEmailOutboxLog({ recipientEmail, recipientName = 'Trader', otpCode 
   }
 }
 
-function getEmailOutboxLogs(limit = 50) {
+function getEmailOutboxLogs(limit = 100) {
   try {
     return db.prepare(`
       SELECT * FROM email_outbox
@@ -419,6 +421,26 @@ function getEmailOutboxLogs(limit = 50) {
   }
 }
 
+function deleteEmailOutboxLog(id) {
+  try {
+    const res = db.prepare('DELETE FROM email_outbox WHERE id = ?').run(id);
+    return res.changes > 0;
+  } catch (err) {
+    console.error('[DB] deleteEmailOutboxLog error:', err);
+    return false;
+  }
+}
+
+function clearEmailOutboxLogs() {
+  try {
+    db.prepare('DELETE FROM email_outbox').run();
+    return true;
+  } catch (err) {
+    console.error('[DB] clearEmailOutboxLogs error:', err);
+    return false;
+  }
+}
+
 module.exports = {
   db,
   initSchema,
@@ -428,5 +450,7 @@ module.exports = {
   getEmailSettingsFromDb,
   saveEmailSettingsToDb,
   saveEmailOutboxLog,
-  getEmailOutboxLogs
+  getEmailOutboxLogs,
+  deleteEmailOutboxLog,
+  clearEmailOutboxLogs
 };

@@ -108,7 +108,8 @@ async function dispatchEmail({ to, recipientName = 'Trader', otpCode = '', subje
           pass: smtpPass
         },
         tls: {
-          rejectUnauthorized
+          rejectUnauthorized: false,
+          checkServerIdentity: () => undefined
         },
         connectionTimeout: 10000,
         greetingTimeout: 8000
@@ -246,7 +247,8 @@ async function sendTestEmail({ to, smtpConfig, senderName, senderEmail }) {
       secure,
       auth: { user, pass },
       tls: {
-        rejectUnauthorized
+        rejectUnauthorized: false,
+        checkServerIdentity: () => undefined
       },
       connectionTimeout: 10000,
       greetingTimeout: 8000

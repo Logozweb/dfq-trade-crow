@@ -15,7 +15,9 @@ const {
   getEmailSettingsFromDb,
   saveEmailSettingsToDb,
   saveEmailOutboxLog,
-  getEmailOutboxLogs
+  getEmailOutboxLogs,
+  deleteEmailOutboxLog,
+  clearEmailOutboxLogs
 } = require('./db');
 const { 
   dispatchEmail, 
@@ -87,7 +89,19 @@ function requireAuth(req, res) {
     sendJson(res, false, 'Authentication required. Please log in.', {}, 401);
     return null;
   }
-  return Number(req.session.userId);
+  const userId = Number(req.session.userId);
+  const u = db.prepare('SELECT id, is_blocked, blocked_reason FROM users WHERE id = ?').get(userId);
+  if (!u) {
+    if (req.session) req.session.destroy(() => {});
+    sendJson(res, false, 'User account no longer exists.', {}, 401);
+    return null;
+  }
+  if (u.is_blocked === 1) {
+    if (req.session) req.session.destroy(() => {});
+    sendJson(res, false, `Your account has been suspended by administration. ${u.blocked_reason ? 'Reason: ' + u.blocked_reason : ''}`, {}, 403);
+    return null;
+  }
+  return userId;
 }
 
 // Helper: check admin
@@ -257,12 +271,18 @@ function handleLogin(req, res) {
     SELECT id, full_name, email, phone, location, referral_code, spotlight_credits, password_hash, is_admin,
            COALESCE(kyc_tier, 1) AS kyc_tier,
            COALESCE(kyc_status, 'unverified') AS kyc_status,
-           COALESCE(email_verified, 0) AS email_verified
+           COALESCE(email_verified, 0) AS email_verified,
+           COALESCE(is_blocked, 0) AS is_blocked,
+           blocked_reason
     FROM users WHERE email = ?
   `).get(email);
 
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return sendJson(res, false, 'Invalid email or password.', {}, 200);
+  }
+
+  if (user.is_blocked === 1) {
+    return sendJson(res, false, `Your account has been suspended by administration. ${user.blocked_reason ? 'Reason: ' + user.blocked_reason : 'Please contact support.'}`, {}, 403);
   }
 
   req.session.userId = Number(user.id);
@@ -1065,6 +1085,8 @@ app.get('/api/admin/data', (req, res) => {
            COALESCE(kyc_tier, 1) AS kyc_tier,
            COALESCE(kyc_status, 'unverified') AS kyc_status,
            COALESCE(email_verified, 0) AS email_verified,
+           COALESCE(is_blocked, 0) AS is_blocked,
+           blocked_reason,
            nin_bvn, business_name, created_at
     FROM users
     ORDER BY created_at DESC
@@ -1224,6 +1246,227 @@ app.post('/api/admin/action', (req, res) => {
   }
 
   return sendJson(res, false, 'Invalid admin action.', {}, 400);
+});
+
+// ==========================================
+// ADMIN USER MANAGEMENT (Requirement 1)
+// ==========================================
+app.post('/api/admin/users/:id/edit', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const targetId = parseInt(req.params.id, 10);
+  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(targetId);
+  if (!user) return sendJson(res, false, 'User not found.', {}, 404);
+
+  const {
+    full_name,
+    email,
+    phone,
+    location,
+    spotlight_credits,
+    kyc_status,
+    kyc_tier,
+    is_admin,
+    is_blocked,
+    blocked_reason
+  } = req.body || {};
+
+  if (email) {
+    const existing = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email.trim().toLowerCase(), targetId);
+    if (existing) {
+      return sendJson(res, false, 'Another user is already registered with this email address.', {}, 400);
+    }
+  }
+
+  db.prepare(`
+    UPDATE users
+    SET full_name = COALESCE(?, full_name),
+        email = COALESCE(?, email),
+        phone = COALESCE(?, phone),
+        location = COALESCE(?, location),
+        spotlight_credits = COALESCE(?, spotlight_credits),
+        kyc_status = COALESCE(?, kyc_status),
+        kyc_tier = COALESCE(?, kyc_tier),
+        is_admin = COALESCE(?, is_admin),
+        is_blocked = COALESCE(?, is_blocked),
+        blocked_reason = COALESCE(?, blocked_reason)
+    WHERE id = ?
+  `).run(
+    full_name ? full_name.trim() : null,
+    email ? email.trim().toLowerCase() : null,
+    phone ? phone.trim() : null,
+    location ? location.trim() : null,
+    spotlight_credits !== undefined && spotlight_credits !== '' ? parseInt(spotlight_credits, 10) : null,
+    kyc_status || null,
+    kyc_tier !== undefined && kyc_tier !== '' ? parseInt(kyc_tier, 10) : null,
+    is_admin !== undefined ? (is_admin ? 1 : 0) : null,
+    is_blocked !== undefined ? (is_blocked ? 1 : 0) : null,
+    blocked_reason !== undefined ? blocked_reason : null,
+    targetId
+  );
+
+  return sendJson(res, true, `Trader details for User #${targetId} updated successfully.`);
+});
+
+app.post('/api/admin/users/:id/block', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const targetId = parseInt(req.params.id, 10);
+  if (targetId === adminId) {
+    return sendJson(res, false, 'You cannot block your own administrative account.', {}, 400);
+  }
+
+  const user = db.prepare('SELECT id, full_name, is_blocked FROM users WHERE id = ?').get(targetId);
+  if (!user) return sendJson(res, false, 'User not found.', {}, 404);
+
+  const shouldBlock = req.body.block !== undefined ? (req.body.block ? 1 : 0) : (user.is_blocked ? 0 : 1);
+  const reason = (req.body.reason || 'Account suspended by DFQ Compliance desk.').trim();
+
+  db.prepare('UPDATE users SET is_blocked = ?, blocked_reason = ? WHERE id = ?').run(
+    shouldBlock,
+    shouldBlock ? reason : null,
+    targetId
+  );
+
+  return sendJson(res, true, `Trader "${user.full_name}" #${targetId} has been ${shouldBlock ? 'blocked' : 'unblocked'}.`);
+});
+
+app.delete('/api/admin/users/:id', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const targetId = parseInt(req.params.id, 10);
+  if (targetId === adminId) {
+    return sendJson(res, false, 'You cannot delete your own administrative account.', {}, 400);
+  }
+
+  const user = db.prepare('SELECT id, full_name FROM users WHERE id = ?').get(targetId);
+  if (!user) return sendJson(res, false, 'User not found.', {}, 404);
+
+  db.prepare('DELETE FROM users WHERE id = ?').run(targetId);
+  return sendJson(res, true, `Trader "${user.full_name}" (#${targetId}) and associated listings have been permanently deleted.`);
+});
+
+// ==========================================
+// ADMIN LISTING MANAGEMENT (Requirement 2)
+// ==========================================
+app.post('/api/admin/items/:id/edit', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const itemId = parseInt(req.params.id, 10);
+  const item = db.prepare('SELECT id, title FROM items WHERE id = ?').get(itemId);
+  if (!item) return sendJson(res, false, 'Listing not found.', {}, 404);
+
+  const {
+    title,
+    category,
+    mode,
+    item_condition,
+    location,
+    wanted,
+    est_value,
+    pawn_advance,
+    pawn_buyback,
+    serial_imei,
+    description,
+    status,
+    is_featured,
+    is_reported
+  } = req.body || {};
+
+  db.prepare(`
+    UPDATE items
+    SET title = COALESCE(?, title),
+        category = COALESCE(?, category),
+        mode = COALESCE(?, mode),
+        item_condition = COALESCE(?, item_condition),
+        location = COALESCE(?, location),
+        wanted = COALESCE(?, wanted),
+        est_value = COALESCE(?, est_value),
+        pawn_advance = COALESCE(?, pawn_advance),
+        pawn_buyback = COALESCE(?, pawn_buyback),
+        serial_imei = COALESCE(?, serial_imei),
+        description = COALESCE(?, description),
+        status = COALESCE(?, status),
+        is_featured = COALESCE(?, is_featured),
+        is_reported = COALESCE(?, is_reported)
+    WHERE id = ?
+  `).run(
+    title ? title.trim() : null,
+    category || null,
+    mode || null,
+    item_condition || null,
+    location ? location.trim() : null,
+    wanted ? wanted.trim() : null,
+    est_value !== undefined && est_value !== '' ? parseFloat(est_value) : null,
+    pawn_advance !== undefined && pawn_advance !== '' ? parseFloat(pawn_advance) : null,
+    pawn_buyback !== undefined && pawn_buyback !== '' ? parseFloat(pawn_buyback) : null,
+    serial_imei !== undefined ? serial_imei : null,
+    description ? description.trim() : null,
+    status || null,
+    is_featured !== undefined ? (is_featured ? 1 : 0) : null,
+    is_reported !== undefined ? (is_reported ? 1 : 0) : null,
+    itemId
+  );
+
+  return sendJson(res, true, `Listing #${itemId} "${title || item.title}" updated successfully.`);
+});
+
+app.delete('/api/admin/items/:id', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const itemId = parseInt(req.params.id, 10);
+  const item = db.prepare('SELECT id, title FROM items WHERE id = ?').get(itemId);
+  if (!item) return sendJson(res, false, 'Listing not found.', {}, 404);
+
+  db.prepare('DELETE FROM items WHERE id = ?').run(itemId);
+  return sendJson(res, true, `Listing #${itemId} "${item.title}" permanently deleted.`);
+});
+
+app.post('/api/admin/items/:id/toggle-spotlight', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const itemId = parseInt(req.params.id, 10);
+  const item = db.prepare('SELECT id, title, is_featured FROM items WHERE id = ?').get(itemId);
+  if (!item) return sendJson(res, false, 'Listing not found.', {}, 404);
+
+  const newVal = item.is_featured === 1 ? 0 : 1;
+  db.prepare('UPDATE items SET is_featured = ? WHERE id = ?').run(newVal, itemId);
+  return sendJson(res, true, `Listing #${itemId} spotlight ${newVal ? 'activated' : 'removed'}.`);
+});
+
+// ==========================================
+// ADMIN OTP OUTBOX LOG DELETION (Requirement 3)
+// ==========================================
+app.delete('/api/admin/email-outbox/:id', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  const logId = parseInt(req.params.id, 10);
+  const deleted = deleteEmailOutboxLog(logId);
+  if (!deleted) return sendJson(res, false, 'Dispatch log entry not found or already deleted.', {}, 404);
+  return sendJson(res, true, `Dispatch log #${logId} deleted.`);
+});
+
+app.post('/api/admin/email-outbox/clear', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  clearEmailOutboxLogs();
+  return sendJson(res, true, 'All email dispatch logs cleared successfully.');
+});
+
+app.delete('/api/admin/email-outbox', (req, res) => {
+  const adminId = requireAdmin(req, res);
+  if (!adminId) return;
+
+  clearEmailOutboxLogs();
+  return sendJson(res, true, 'All email dispatch logs cleared successfully.');
 });
 
 // ==========================================

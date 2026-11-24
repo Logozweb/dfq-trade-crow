@@ -47,6 +47,7 @@ import AdminLoginView from './components/AdminLoginView';
 import AnimatedHeroSection from './components/AnimatedHeroSection';
 import NotificationCenterModal from './components/NotificationCenterModal';
 import RealtimeChatDrawer from './components/RealtimeChatDrawer';
+import Pagination from './components/Pagination';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -91,6 +92,8 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [kycAlertModal, setKycAlertModal] = useState(false);
+  const [marketplacePage, setMarketplacePage] = useState(1);
+  const MARKETPLACE_PAGE_SIZE = 12;
 
   // Apply Theme
   useEffect(() => {
@@ -233,6 +236,16 @@ export default function App() {
       return true;
     });
   }, [items, selectedMode, selectedCategory, selectedLocation, searchQuery, favorites]);
+
+  // Reset marketplace pagination when filters change (Requirement 5)
+  useEffect(() => {
+    setMarketplacePage(1);
+  }, [selectedMode, selectedCategory, selectedLocation, searchQuery]);
+
+  const paginatedItems = useMemo(() => {
+    const start = (marketplacePage - 1) * MARKETPLACE_PAGE_SIZE;
+    return filteredItems.slice(start, start + MARKETPLACE_PAGE_SIZE);
+  }, [filteredItems, marketplacePage]);
 
   // Open Chat Drawer
   const openChatFor = (item, otherTrader = null) => {
@@ -731,9 +744,10 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filteredItems.map(item => {
-                  const isFav = favorites.includes(Number(item.id));
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {paginatedItems.map(item => {
+                    const isFav = favorites.includes(Number(item.id));
                   const isReceipt = Boolean(item.receipt_path);
                   const isSpotlight = Number(item.is_featured) === 1;
 
@@ -876,7 +890,23 @@ export default function App() {
                   );
                 })}
               </div>
-            )}
+
+              {/* Consumer Marketplace Pagination (Requirement 5) */}
+              <div className="mt-8 pt-4 border-t border-slate-200/80 dark:border-slate-800/80">
+                <Pagination
+                  currentPage={marketplacePage}
+                  totalItems={filteredItems.length}
+                  pageSize={MARKETPLACE_PAGE_SIZE}
+                  onPageChange={(p) => {
+                    setMarketplacePage(p);
+                    const el = document.getElementById('marketplace-feed');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  itemLabel="available trades & pawn deals"
+                />
+              </div>
+            </>
+          )}
           </main>
         </>
       )}
