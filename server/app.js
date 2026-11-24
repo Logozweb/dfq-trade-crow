@@ -76,6 +76,7 @@ function sendJson(res, success, message, data = {}, code = 200) {
   return res.status(code).json({
     success,
     message,
+    data,
     ...data
   });
 }

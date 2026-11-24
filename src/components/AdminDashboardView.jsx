@@ -53,8 +53,9 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
     try {
       const res = await fetch('/api/admin/email-settings');
       const json = await res.json();
-      if (json.success && json.data.settings) {
-        setEmailSettings(json.data.settings);
+      const s = json.settings || json.data?.settings;
+      if (json.success && s) {
+        setEmailSettings(s);
       }
     } catch (_) {}
   };
@@ -65,8 +66,9 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
       const res = await fetch('/api/admin/email-outbox');
       const json = await res.json();
       setOutboxLoading(false);
-      if (json.success && json.data.logs) {
-        setOutboxLogs(json.data.logs);
+      const logs = json.logs || json.data?.logs;
+      if (json.success && logs) {
+        setOutboxLogs(logs);
       }
     } catch (_) {
       setOutboxLoading(false);
@@ -97,13 +99,14 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
       setEmailSaving(false);
       if (json.success) {
         showToast('Email dispatcher settings saved successfully!');
-        if (json.data.settings) setEmailSettings(json.data.settings);
+        const s = json.settings || json.data?.settings;
+        if (s) setEmailSettings(s);
       } else {
         alert(json.message || 'Failed to save settings.');
       }
-    } catch (_) {
+    } catch (err) {
       setEmailSaving(false);
-      alert('Error saving email settings.');
+      alert(`Error saving email settings: ${err.message || 'Network request failed'}`);
     }
   };
 
@@ -1036,6 +1039,26 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                           {emailSettings.smtp?.secure ? 'SSL (465)' : 'TLS (587)'}
                         </button>
                       </div>
+                    </div>
+
+                    <div className="sm:col-span-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
+                      <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700 dark:text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={emailSettings.smtp?.rejectUnauthorized !== true}
+                          onChange={(e) => setEmailSettings(prev => ({
+                            ...prev,
+                            smtp: { ...prev.smtp, rejectUnauthorized: !e.target.checked }
+                          }))}
+                          className="rounded border-slate-300 text-sky-600 focus:ring-sky-500 w-4 h-4"
+                        />
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          Allow Shared-Host / cPanel SSL (Bypasses TLS Certificate Name Mismatch)
+                        </span>
+                      </label>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 pl-6 leading-relaxed mb-0">
+                        Required when connecting to shared hosting mail servers (e.g. <code>mail.pauladisa.com</code> whose server certificate is issued to <code>*.web-hosting.com</code>).
+                      </p>
                     </div>
                   </div>
 

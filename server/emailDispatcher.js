@@ -95,6 +95,7 @@ async function dispatchEmail({ to, recipientName = 'Trader', otpCode = '', subje
   const smtpUser = (settings.smtp && settings.smtp.user) || process.env.SMTP_USER;
   const smtpPass = (settings.smtp && settings.smtp.pass) || process.env.SMTP_PASS;
   const smtpSecure = (settings.smtp && typeof settings.smtp.secure === 'boolean') ? settings.smtp.secure : Number(smtpPort) === 465;
+  const rejectUnauthorized = (settings.smtp && typeof settings.smtp.rejectUnauthorized === 'boolean') ? settings.smtp.rejectUnauthorized : false;
 
   if (settings.provider === 'smtp' && smtpHost && smtpUser && smtpPass) {
     try {
@@ -105,7 +106,12 @@ async function dispatchEmail({ to, recipientName = 'Trader', otpCode = '', subje
         auth: {
           user: smtpUser,
           pass: smtpPass
-        }
+        },
+        tls: {
+          rejectUnauthorized
+        },
+        connectionTimeout: 10000,
+        greetingTimeout: 8000
       });
 
       const info = await transporter.sendMail({
@@ -227,6 +233,7 @@ async function sendTestEmail({ to, smtpConfig, senderName, senderEmail }) {
   const secure = smtpConfig.secure === true || port === 465;
   const user = smtpConfig.user;
   const pass = smtpConfig.pass;
+  const rejectUnauthorized = typeof smtpConfig.rejectUnauthorized === 'boolean' ? smtpConfig.rejectUnauthorized : false;
 
   if (!host || !user || !pass) {
     return { success: false, error: 'SMTP Host, Username, and Password are required for verification test.' };
@@ -238,8 +245,11 @@ async function sendTestEmail({ to, smtpConfig, senderName, senderEmail }) {
       port,
       secure,
       auth: { user, pass },
-      connectionTimeout: 8000,
-      greetingTimeout: 5000
+      tls: {
+        rejectUnauthorized
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 8000
     });
 
     // Verify SMTP handshake
