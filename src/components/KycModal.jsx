@@ -107,18 +107,20 @@ export default function KycModal({ user, onClose, onSuccess }) {
     const targetTier = showUpgradeForm || currentStatus === 'approved' ? 3 : parseInt(tier, 10);
 
     if (targetTier === 2) {
-      if (!ninBvn.trim() || ninBvn.trim().length < 8) {
+      const cleanNin = ninBvn.trim().replace(/\D/g, '');
+      const cleanBvn = bvnNumber.trim().replace(/\D/g, '');
+      if (!cleanNin || cleanNin.length !== 11) {
         setError('Please provide a valid 11-digit National Identification Number (NIN).');
         setLoading(false);
         return;
       }
-      if (!bvnNumber.trim() || bvnNumber.trim().length < 8) {
+      if (!cleanBvn || cleanBvn.length !== 11) {
         setError('Please provide a valid 11-digit Bank Verification Number (BVN).');
         setLoading(false);
         return;
       }
       if (!idPreview) {
-        setError('NIN Card / Slip upload is compulsory for Tier 2 verification.');
+        setError('NIN Card or NIMC Slip upload is compulsory for Tier 2 verification.');
         setLoading(false);
         return;
       }
@@ -522,47 +524,15 @@ export default function KycModal({ user, onClose, onSuccess }) {
               </div>
             )}
 
-            {/* Tier Selector */}
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              <div
-                onClick={() => setTier('2')}
-                className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                  tier === '2'
-                    ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-500 dark:border-sky-600 shadow-sm'
-                    : 'bg-transparent border-slate-200 dark:border-slate-800 hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-1.5 font-bold text-xs mb-1 text-sky-700 dark:text-sky-300">
-                  <BadgeCheck className="w-4 h-4" />
-                  <span>Tier 2: Trader</span>
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200 block w-fit mb-1">
-                  Blue Shield Badge
-                </span>
-                <p className="text-[10px] text-slate-500 mb-0 leading-tight">
-                  Listings up to ₦1M, Escrow access &amp; instant barter proposals.
-                </p>
+            {/* Single Current Tier Application Banner */}
+            <div className="p-3.5 mb-4 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-950/40">
+              <div className="flex items-center gap-2 font-bold text-xs text-sky-800 dark:text-sky-300 mb-1">
+                <BadgeCheck className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                <span>Tier 2 Trader Verification (Blue Shield)</span>
               </div>
-
-              <div
-                onClick={() => setTier('3')}
-                className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                  tier === '3'
-                    ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 dark:border-amber-600 shadow-sm'
-                    : 'bg-transparent border-slate-200 dark:border-slate-800 hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-1.5 font-bold text-xs mb-1 text-amber-700 dark:text-amber-300">
-                  <Award className="w-4 h-4" />
-                  <span>Tier 3: Pro Store</span>
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 block w-fit mb-1">
-                  Gold Seal Badge
-                </span>
-                <p className="text-[10px] text-slate-500 mb-0 leading-tight">
-                  Verified storefront, high collateral limits &amp; zero escrow wait.
-                </p>
-              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 mb-0 leading-relaxed">
+                Unlock instant barter proposals, listings up to ₦1M, and escrow protection. Both your 11-digit NIN (with card/slip upload) and 11-digit BVN are mandatory for identity authentication.
+              </p>
             </div>
 
             {error && (
@@ -571,7 +541,7 @@ export default function KycModal({ user, onClose, onSuccess }) {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-3">
+            <form onSubmit={handleSubmit} className="space-y-3.5">
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-semibold mb-1 text-slate-700 dark:text-slate-300">
@@ -601,76 +571,28 @@ export default function KycModal({ user, onClose, onSuccess }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <div className="col-span-1">
-                  <label className="block text-xs font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                    ID Type *
-                  </label>
-                  <select
-                    value={idType}
-                    onChange={e => setIdType(e.target.value)}
-                    className="w-full px-2.5 py-2 text-xs border rounded-xl outline-none border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:border-sky-500 cursor-pointer"
-                  >
-                    <option value="NIN">NIN Slip</option>
-                    <option value="BVN">BVN</option>
-                    <option value="Voters Card">Voter's Card</option>
-                    <option value="Drivers License">Driver's License</option>
-                    <option value="Passport">Passport</option>
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                    NIN or BVN Number *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={14}
-                    value={ninBvn}
-                    onChange={e => setNinBvn(e.target.value)}
-                    placeholder="11-digit NIN or BVN"
-                    className="w-full px-3 py-2 text-xs border rounded-xl outline-none font-mono border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:border-sky-500"
-                  />
-                </div>
-              </div>
-
-              {tier === '3' && (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                      Store / Merchant Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={businessName}
-                      onChange={e => setBusinessName(e.target.value)}
-                      placeholder="e.g. Lagos Tech Exchanges Ltd"
-                      className="w-full px-3 py-2 text-xs border rounded-xl outline-none border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:border-sky-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                      Physical Store Address *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={businessAddress}
-                      onChange={e => setBusinessAddress(e.target.value)}
-                      placeholder="e.g. 14 Computer Village, Ikeja"
-                      className="w-full px-3 py-2 text-xs border rounded-xl outline-none border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:border-sky-500"
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Upload ID Document */}
+              {/* National Identification Number (NIN) */}
               <div>
                 <label className="block text-xs font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                  Upload ID Photo or NIN Slip (Optional)
+                  National Identification Number (NIN) *
                 </label>
-                <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-3 text-center bg-slate-50 dark:bg-slate-800/40 relative">
+                <input
+                  type="text"
+                  required
+                  maxLength={11}
+                  value={ninBvn}
+                  onChange={e => setNinBvn(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Enter 11-digit NIN"
+                  className="w-full px-3 py-2 text-xs border rounded-xl outline-none font-mono border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:border-sky-500"
+                />
+              </div>
+
+              {/* Upload NIN Card / Slip (Compulsory) */}
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-slate-700 dark:text-slate-300">
+                  Upload NIN Card or NIMC Slip * (Compulsory)
+                </label>
+                <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-3 text-center bg-slate-50 dark:bg-slate-800/40 relative hover:border-sky-400 transition-colors">
                   <input
                     type="file"
                     accept="image/*,application/pdf"
@@ -678,17 +600,36 @@ export default function KycModal({ user, onClose, onSuccess }) {
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                   />
                   {idPreview ? (
-                    <div className="flex items-center justify-center gap-2 text-xs font-medium text-emerald-600">
+                    <div className="flex items-center justify-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>Document attached ready for review</span>
+                      <span>NIN Document Attached &amp; Ready for Review</span>
                     </div>
                   ) : (
                     <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
                       <UploadCloud className="w-4 h-4 text-sky-500" />
-                      <span>Click to upload photo of NIN / ID card</span>
+                      <span>Click to upload clear photo of NIN Card or NIMC Slip</span>
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Bank Verification Number (BVN) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Bank Verification Number (BVN) *
+                  </label>
+                  <span className="text-[10px] text-slate-400">Strictly for identity match</span>
+                </div>
+                <input
+                  type="text"
+                  required
+                  maxLength={11}
+                  value={bvnNumber}
+                  onChange={e => setBvnNumber(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Enter 11-digit BVN"
+                  className="w-full px-3 py-2 text-xs border rounded-xl outline-none font-mono border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:border-sky-500"
+                />
               </div>
 
               <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
