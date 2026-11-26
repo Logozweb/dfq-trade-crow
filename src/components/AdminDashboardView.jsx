@@ -482,7 +482,7 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
   }, [outboxLogs, outboxPage]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full">
       {/* Edit User Modal */}
       {editingUser && (
         <AdminEditUserModal
