@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <rect width="800" height="500" fill="#E0F2FE"/>
+  <rect x="210" y="135" width="380" height="235" rx="20" fill="#0284C7" stroke="#0F172A" stroke-width="5"/>
+  <rect x="240" y="165" width="190" height="145" rx="12" fill="#0F172A"/>
+  <rect x="455" y="165" width="105" height="145" rx="12" fill="#FFFFFF"/>
+  <circle cx="507" cy="210" r="22" fill="#0EA5E9"/>
+  <rect x="475" y="255" width="64" height="34" rx="6" fill="#10B981"/>
+  <circle cx="265" cy="382" r="24" fill="#0F172A"/>
+  <circle cx="535" cy="382" r="24" fill="#0F172A"/>
+  <text x="335" y="242" font-family="monospace" font-size="22" font-weight="700" fill="#38BDF8" text-anchor="middle">3.8kVA KEY START</text>
+  <text x="400" y="86" font-family="sans-serif" font-size="23" font-weight="700" fill="#0F172A" text-anchor="middle">3.8kVA Copper Coil Key-Start Generator</text>
+  <text x="400" y="452" font-family="sans-serif" font-size="17" font-weight="600" fill="#0284C7" text-anchor="middle">Swap for Inverter, Laptop or Cash</text>
+</svg>

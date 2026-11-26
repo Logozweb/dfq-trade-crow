@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <rect width="800" height="500" fill="#F0F9FF"/>
+  <path d="M335 90 C350 180 350 310 330 400 L470 400 C450 310 450 180 465 90 Z" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="3"/>
+  <rect x="368" y="105" width="64" height="285" rx="14" fill="#0F172A"/>
+  <line x1="365" y1="115" x2="365" y2="380" stroke="#0EA5E9" stroke-width="5"/>
+  <line x1="435" y1="115" x2="435" y2="380" stroke="#0EA5E9" stroke-width="5"/>
+  <text x="400" y="452" font-family="sans-serif" font-size="20" font-weight="700" fill="#0F172A" text-anchor="middle">PlayStation 5 Disc Edition + 2 DualSense Pads</text>
+</svg>

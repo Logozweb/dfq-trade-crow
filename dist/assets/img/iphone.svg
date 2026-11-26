@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <defs><linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F0F9FF"/><stop offset="100%" stop-color="#E0F2FE"/></linearGradient></defs>
+  <rect width="800" height="500" fill="url(#bg2)"/>
+  <ellipse cx="400" cy="435" rx="140" ry="18" fill="#0F172A" opacity="0.12"/>
+  <rect x="315" y="75" width="170" height="340" rx="30" fill="#0F172A" stroke="#38BDF8" stroke-width="4"/>
+  <rect x="326" y="88" width="148" height="314" rx="22" fill="#0284C7"/>
+  <rect x="372" y="98" width="56" height="14" rx="7" fill="#0F172A"/>
+  <circle cx="400" cy="245" r="44" fill="#FFFFFF" opacity="0.18"/>
+  <path d="M385 245 L396 256 L418 232" stroke="#FFFFFF" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <text x="400" y="468" font-family="sans-serif" font-size="20" font-weight="700" fill="#0F172A" text-anchor="middle">iPhone 14 Pro Max (256GB) • Receipt Verified</text>
+</svg>

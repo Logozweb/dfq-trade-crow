@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <rect width="800" height="500" fill="#F8FAFC"/>
+  <ellipse cx="400" cy="410" rx="270" ry="20" fill="#0F172A" opacity="0.1"/>
+  <rect x="210" y="110" width="380" height="245" rx="18" fill="#0F172A"/>
+  <rect x="224" y="124" width="352" height="215" rx="8" fill="#0EA5E9"/>
+  <path d="M165 355 H635 L615 382 H185 Z" fill="#94A3B8"/>
+  <rect x="355" y="355" width="90" height="8" rx="4" fill="#475569"/>
+  <text x="400" y="238" font-family="sans-serif" font-size="24" font-weight="700" fill="#FFFFFF" text-anchor="middle">MacBook Pro M2 (16GB / 512GB)</text>
+  <text x="400" y="455" font-family="sans-serif" font-size="18" font-weight="600" fill="#334155" text-anchor="middle">Pawn / Quick Sale or Swap</text>
+</svg>

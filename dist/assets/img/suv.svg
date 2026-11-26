@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <defs><linearGradient id="gSuvBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#E0F2FE"/><stop offset="100%" stop-color="#BAE6FD"/></linearGradient></defs>
+  <rect width="800" height="500" fill="url(#gSuvBg)"/>
+  <ellipse cx="400" cy="402" rx="315" ry="22" fill="#0F172A" opacity="0.12"/>
+  <path d="M145 318 L162 215 L230 165 L540 165 L615 225 L660 255 L662 325 L142 325 Z" fill="#0F172A"/>
+  <path d="M242 180 L375 180 L375 232 L185 232 Z" fill="#38BDF8"/>
+  <path d="M390 180 L528 180 L585 232 L390 232 Z" fill="#38BDF8"/>
+  <rect x="622" y="262" width="32" height="16" rx="5" fill="#FEF08A"/>
+  <circle cx="242" cy="325" r="50" fill="#1E293B" stroke="#E2E8F0" stroke-width="6"/>
+  <circle cx="242" cy="325" r="22" fill="#94A3B8"/>
+  <circle cx="558" cy="325" r="50" fill="#1E293B" stroke="#E2E8F0" stroke-width="6"/>
+  <circle cx="558" cy="325" r="22" fill="#94A3B8"/>
+  <text x="400" y="82" font-family="sans-serif" font-size="24" font-weight="700" fill="#0F172A" text-anchor="middle">Lexus RX 350 / Mid-Size SUV</text>
+  <text x="400" y="454" font-family="sans-serif" font-size="17" font-weight="600" fill="#0284C7" text-anchor="middle">Car Swap, Top-Up Trade or Direct Sale</text>
+</svg>
