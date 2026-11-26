@@ -51,7 +51,7 @@ export default function AdminLoginView({ onAdminAuthenticated, onBackToMarketpla
             Administrator Gateway
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
-            DFQ Trade Crow • Operations &amp; Moderation Console
+            DFQ Trade Escrow • Operations &amp; Moderation Console
           </p>
         </div>
 

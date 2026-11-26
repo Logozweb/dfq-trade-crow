@@ -2,13 +2,13 @@ const nodemailer = require('nodemailer');
 
 function buildOtpEmailHtml(name, code, purpose = 'registration') {
   const isReset = purpose === 'password_reset';
-  const heading = isReset ? 'Reset Your Trade Crow Password' : 'Verify Your Email Address';
+  const heading = isReset ? 'Reset Your Trade Escrow Password' : 'Verify Your Email Address';
   const subtitle = isReset ? 'Account Password Reset Code' : 'Trader Identity & Email Verification';
 
   return `
     <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px;">
       <div style="background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%); color: #ffffff; padding: 24px; text-align: center; border-radius: 12px; box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);">
-        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #e0f2fe; margin-bottom: 4px;">DFQ TRADE CROW</div>
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #e0f2fe; margin-bottom: 4px;">DFQ TRADE ESCROW</div>
         <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff;">${heading}</h2>
         <p style="margin: 6px 0 0; font-size: 12px; color: #bae6fd;">${subtitle}</p>
       </div>
@@ -19,8 +19,8 @@ function buildOtpEmailHtml(name, code, purpose = 'registration') {
         </p>
         <p style="margin: 0 0 16px; font-size: 13px; color: #475569; line-height: 1.6;">
           ${isReset
-            ? 'We received a request to reset your DFQ Trade Crow password. Use the verification code below to authorize this change:'
-            : 'Welcome to DFQ Trade Crow! To activate your peer-to-peer trading account and safeguard our community against impersonation, please verify your email with the one-time code below:'}
+            ? 'We received a request to reset your DFQ Trade Escrow password. Use the verification code below to authorize this change:'
+            : 'Welcome to DFQ Trade Escrow! To activate your peer-to-peer trading account and safeguard our community against impersonation, please verify your email with the one-time code below:'}
         </p>
 
         <div style="background: #f0f9ff; border: 2px dashed #0ea5e9; border-radius: 12px; padding: 18px; text-align: center; margin: 20px 0;">
@@ -36,7 +36,7 @@ function buildOtpEmailHtml(name, code, purpose = 'registration') {
       </div>
 
       <div style="text-align: center; margin-top: 20px; font-size: 11px; color: #94a3b8; line-height: 1.5;">
-        DFQ Trade Crow • Peer-to-Peer Barter, Digital Pawn & Escrow Marketplace<br/>
+        DFQ Trade Escrow • Peer-to-Peer Barter, Digital Pawn & Escrow Marketplace<br/>
         Lagos & Abuja, Nigeria • Verified P2P Trading Hub
       </div>
     </div>
@@ -47,7 +47,7 @@ function buildStatusNotificationHtml(name, title, message, actionText, actionUrl
   return `
     <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px;">
       <div style="background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%); color: #ffffff; padding: 20px; text-align: center; border-radius: 12px;">
-        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #e0f2fe;">DFQ TRADE CROW NOTIFICATION</div>
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #e0f2fe;">DFQ TRADE ESCROW NOTIFICATION</div>
         <h2 style="margin: 4px 0 0; font-size: 18px; font-weight: 700; color: #ffffff;">${title}</h2>
       </div>
 
@@ -62,7 +62,7 @@ function buildStatusNotificationHtml(name, title, message, actionText, actionUrl
       </div>
 
       <div style="text-align: center; margin-top: 20px; font-size: 11px; color: #94a3b8;">
-        DFQ Trade Crow • Verified Escrow & Barter Network
+        DFQ Trade Escrow • Verified Escrow & Barter Network
       </div>
     </div>
   `;
@@ -84,9 +84,9 @@ async function dispatchEmail({ to, recipientName = 'Trader', otpCode = '', subje
     settings = { provider: 'smtp', smtp: {} };
   }
 
-  const senderName = settings.senderName || 'DFQ Trade Crow Security';
+  const senderName = settings.senderName || 'DFQ Trade Escrow Security';
   const senderEmail = settings.senderEmail || (settings.smtp && settings.smtp.user) || 'no-reply@dfqtradecrow.com';
-  const mailSubject = subject || (otpCode ? `${settings.subjectLine || 'DFQ Trade Crow - Your Verification Code'}: ${otpCode}` : 'DFQ Trade Crow Notification');
+  const mailSubject = subject || (otpCode ? `${settings.subjectLine || 'DFQ Trade Escrow - Your Verification Code'}: ${otpCode}` : 'DFQ Trade Escrow Notification');
   const mailHtml = html || buildOtpEmailHtml(recipientName, otpCode, purpose);
 
   // 1. SMTP Provider
@@ -257,14 +257,14 @@ async function sendTestEmail({ to, smtpConfig, senderName, senderEmail }) {
     // Verify SMTP handshake
     await transporter.verify();
 
-    const fromName = senderName || 'DFQ Trade Crow Dispatcher Test';
+    const fromName = senderName || 'DFQ Trade Escrow Dispatcher Test';
     const testCode = Math.floor(100000 + Math.random() * 900000).toString();
     const testHtml = buildOtpEmailHtml('Administrator', testCode, 'test');
 
     const info = await transporter.sendMail({
       from: `"${fromName}" <${user}>`,
       to: cleanTo,
-      subject: `DFQ Trade Crow - Dispatcher Test Email [${testCode}]`,
+      subject: `DFQ Trade Escrow - Dispatcher Test Email [${testCode}]`,
       html: testHtml
     });
 

@@ -319,7 +319,7 @@ export default function App() {
                 <ArrowLeftRight className="w-4 h-4 shrink-0" />
               </div>
               <span className="font-extrabold text-[15px] sm:text-base tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0">
-                DFQ <span className="text-sky-600 dark:text-sky-400">Trade Crow</span>
+                DFQ <span className="text-sky-600 dark:text-sky-400">Trade Escrow</span>
               </span>
             </button>
           </div>
@@ -432,10 +432,11 @@ export default function App() {
             {/* + Post Listing CTA */}
             <button
               onClick={handleOpenPostListing}
-              className="inline-flex items-center gap-1.5 text-xs sm:text-[13px] font-semibold px-2.5 sm:px-3.5 py-1.5 rounded-lg border-0 cursor-pointer text-white shadow-sm bg-sky-600 hover:bg-sky-500 active:bg-sky-700 transition-all shadow-sky-600/20 whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1 sm:gap-1.5 text-xs sm:text-[13px] font-semibold px-2.5 sm:px-3.5 py-1.5 rounded-lg border-0 cursor-pointer text-white shadow-sm bg-sky-600 hover:bg-sky-500 active:bg-sky-700 transition-all shadow-sky-600/20 whitespace-nowrap shrink-0"
             >
               <Plus className="w-3.5 h-3.5 shrink-0" />
-              <span className="whitespace-nowrap">Post Listing</span>
+              <span className="sm:hidden whitespace-nowrap">Post</span>
+              <span className="hidden sm:inline whitespace-nowrap">Post Listing</span>
             </button>
 
             {/* Auth Buttons / My Dashboard Dropdown */}
@@ -443,10 +444,10 @@ export default function App() {
               <div className="relative shrink-0" ref={dashboardMenuRef}>
                 <button
                   onClick={() => setShowDashboardMenu(prev => !prev)}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                  className="flex items-center gap-1 sm:gap-1.5 text-xs font-semibold px-2 sm:px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
                 >
                   <User className="w-3.5 h-3.5 shrink-0" />
-                  <span className="whitespace-nowrap">My Dashboard</span>
+                  <span className="hidden sm:inline whitespace-nowrap">My Dashboard</span>
                   <ChevronDown className={`w-3 h-3 transition-transform ${showDashboardMenu ? 'rotate-180' : ''}`} />
                 </button>
                 {showDashboardMenu && (
@@ -1023,7 +1024,7 @@ export default function App() {
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
               {user?.kyc_status === 'pending_review'
                 ? 'Your NIN and identity documents are currently under review by an administrator. Once approved, you will be able to post listings immediately.'
-                : 'To safeguard our trading ecosystem, members must verify their details and National Identification Number (NIN) before listing items on DFQ Trade Crow.'}
+                : 'To safeguard our trading ecosystem, members must verify their details and National Identification Number (NIN) before listing items on DFQ Trade Escrow.'}
             </p>
             <div className="pt-2 flex items-center justify-center gap-2">
               <button
@@ -1161,7 +1162,7 @@ export default function App() {
                 ) : (
                   <div className="font-semibold flex items-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                    <span>Clean Record: Zero theft reports found on DFQ Trade Crow records.</span>
+                    <span>Clean Record: Zero theft reports found on DFQ Trade Escrow records.</span>
                   </div>
                 )}
               </div>
@@ -1179,7 +1180,7 @@ export default function App() {
                 <div className="w-6 h-6 rounded-lg bg-sky-600 flex items-center justify-center text-white font-bold shadow-xs">
                   <ArrowLeftRight className="w-3.5 h-3.5" />
                 </div>
-                <span>DFQ Trade Crow</span>
+                <span>DFQ Trade Escrow</span>
               </div>
               <p className="text-xs max-w-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                 Nigeria's verified peer-to-peer barter, cash-top-up, and receipt-verified digital pawn marketplace. Backed by inspection hold escrow and anti-theft screening.
@@ -1205,7 +1206,7 @@ export default function App() {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-between text-xs gap-3 text-slate-400">
-            <span>&copy; {new Date().getFullYear()} DFQ Trade Crow Systems Ltd. All rights reserved.</span>
+            <span>&copy; {new Date().getFullYear()} DFQ Trade Escrow Systems Ltd. All rights reserved.</span>
             <span>Operating under Federal Republic of Nigeria Trade &amp; Collateral Regulations.</span>
           </div>
         </div>

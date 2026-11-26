@@ -243,7 +243,7 @@ async function handleRegister(req, res) {
   req.session.isAdmin = isAdmin;
 
   // Create welcome notification
-  createNotification(userId, 'Welcome to DFQ Trade Crow', 'Your email is verified! Complete your KYC verification (NIN / Government ID) to unlock listing privileges and start trading.', 'kyc');
+  createNotification(userId, 'Welcome to DFQ Trade Escrow', 'Your email is verified! Complete your KYC verification (NIN / Government ID) to unlock listing privileges and start trading.', 'kyc');
 
   const userObj = {
     id: userId,
@@ -556,7 +556,7 @@ function handleCreateItem(req, res) {
   if (serialImei !== '') {
     const check = db.prepare(`SELECT id FROM items WHERE serial_imei = ? AND (is_reported = 1 OR status = 'Removed')`).get(serialImei);
     if (check) {
-      return sendJson(res, false, 'Security Alert: This Serial/IMEI has been flagged on DFQ Trade Crow and cannot be listed.', {}, 403);
+      return sendJson(res, false, 'Security Alert: This Serial/IMEI has been flagged on DFQ Trade Escrow and cannot be listed.', {}, 403);
     }
   }
 
@@ -640,7 +640,7 @@ function handleCreateItem(req, res) {
     return sendJson(res, true, 'Item submitted successfully! Your listing is pending administrative review before going live.', { item_id: itemId, status: 'pending_review' }, 201);
   }
 
-  return sendJson(res, true, 'Item posted live to DFQ Trade Crow!', { item_id: itemId, status: 'Active' }, 201);
+  return sendJson(res, true, 'Item posted live to DFQ Trade Escrow!', { item_id: itemId, status: 'Active' }, 201);
 }
 
 function handleBoostItem(req, res) {
@@ -666,7 +666,7 @@ function handleReportItem(req, res) {
   const reason = (req.body.reason || 'Suspicious listing').trim();
   if (itemId) {
     db.prepare('UPDATE items SET is_reported = 1, report_reason = ? WHERE id = ?').run(reason, itemId);
-    return sendJson(res, true, 'Listing flagged for Admin review. Thank you for keeping DFQ Trade Crow safe.');
+    return sendJson(res, true, 'Listing flagged for Admin review. Thank you for keeping DFQ Trade Escrow safe.');
   }
   return sendJson(res, false, 'Invalid item ID.', {}, 400);
 }
@@ -1271,7 +1271,7 @@ app.post('/api/admin/items/:id/approve', (req, res) => {
     `/item/${itemId}`
   );
 
-  return sendJson(res, true, `Listing #${itemId} "${item.title}" is now approved and live on DFQ Trade Crow!`);
+  return sendJson(res, true, `Listing #${itemId} "${item.title}" is now approved and live on DFQ Trade Escrow!`);
 });
 
 app.post('/api/admin/items/:id/reject', (req, res) => {

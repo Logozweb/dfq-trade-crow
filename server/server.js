@@ -46,7 +46,7 @@ app.use((req, res, next) => {
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`====================================================`);
-  console.log(`🚀 DFQ Trade Crow Standalone Server is running!`);
+  console.log(`🚀 DFQ Trade Escrow Standalone Server is running!`);
   console.log(`   URL: http://localhost:${PORT}`);
   console.log(`   API: http://localhost:${PORT}/api/items`);
   console.log(`====================================================`);

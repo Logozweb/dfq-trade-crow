@@ -53,7 +53,7 @@ export default function TrustCenterView() {
           <>
             <h4 className="text-sm font-bold" style={{ color: 'var(--dfq-text)' }}>1. Peer-to-Peer Barter &amp; Direct Physical Swaps</h4>
             <p className="text-slate-500">
-              DFQ Trade Crow facilitates structured peer-to-peer barters. For in-person swaps outside Escrow Hold, traders must physically inspect serial numbers and hardware condition prior to handover. Direct peer-to-peer swaps are final once handover is verified by both parties.
+              DFQ Trade Escrow facilitates structured peer-to-peer barters. For in-person swaps outside Escrow Hold, traders must physically inspect serial numbers and hardware condition prior to handover. Direct peer-to-peer swaps are final once handover is verified by both parties.
             </p>
             <h4 className="text-sm font-bold" style={{ color: 'var(--dfq-text)' }}>2. 100% Escrow Hold &amp; Inspection Guarantee</h4>
             <p className="text-slate-500">

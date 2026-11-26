@@ -155,9 +155,9 @@ function initSchema() {
       provider TEXT DEFAULT 'smtp',
       smtp_config TEXT,
       resend_api_key TEXT,
-      sender_name TEXT DEFAULT 'DFQ Trade Crow Security',
+      sender_name TEXT DEFAULT 'DFQ Trade Escrow Security',
       sender_email TEXT DEFAULT 'no-reply@dfqtradecrow.com',
-      subject_line TEXT DEFAULT 'DFQ Trade Crow - Your Verification Code',
+      subject_line TEXT DEFAULT 'DFQ Trade Escrow - Your Verification Code',
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -338,7 +338,7 @@ function getEmailSettingsFromDb() {
   try {
     const row = db.prepare('SELECT * FROM email_settings WHERE id = ?').get('primary');
     if (row) {
-      let smtp = { host: 'smtp.gmail.com', port: '587', secure: false, user: '', pass: '', senderName: 'DFQ Trade Crow Security' };
+      let smtp = { host: 'smtp.gmail.com', port: '587', secure: false, user: '', pass: '', senderName: 'DFQ Trade Escrow Security' };
       try {
         if (row.smtp_config) smtp = { ...smtp, ...JSON.parse(row.smtp_config) };
       } catch (_) {}
@@ -346,9 +346,9 @@ function getEmailSettingsFromDb() {
         provider: row.provider || 'smtp',
         smtp,
         resendApiKey: row.resend_api_key || '',
-        senderName: row.sender_name || 'DFQ Trade Crow Security',
+        senderName: row.sender_name || 'DFQ Trade Escrow Security',
         senderEmail: row.sender_email || 'no-reply@dfqtradecrow.com',
-        subjectLine: row.subject_line || 'DFQ Trade Crow - Your Verification Code',
+        subjectLine: row.subject_line || 'DFQ Trade Escrow - Your Verification Code',
         updatedAt: row.updated_at
       };
     }
@@ -358,11 +358,11 @@ function getEmailSettingsFromDb() {
 
   return {
     provider: 'smtp',
-    smtp: { host: 'smtp.gmail.com', port: '587', secure: false, user: '', pass: '', senderName: 'DFQ Trade Crow Security' },
+    smtp: { host: 'smtp.gmail.com', port: '587', secure: false, user: '', pass: '', senderName: 'DFQ Trade Escrow Security' },
     resendApiKey: '',
-    senderName: 'DFQ Trade Crow Security',
+    senderName: 'DFQ Trade Escrow Security',
     senderEmail: 'no-reply@dfqtradecrow.com',
-    subjectLine: 'DFQ Trade Crow - Your Verification Code'
+    subjectLine: 'DFQ Trade Escrow - Your Verification Code'
   };
 }
 
@@ -372,9 +372,9 @@ function saveEmailSettingsToDb(settings) {
     const smtpConfigJson = JSON.stringify(settings.smtp || {});
     const provider = settings.provider || 'smtp';
     const resendApiKey = settings.resendApiKey || '';
-    const senderName = settings.senderName || 'DFQ Trade Crow Security';
+    const senderName = settings.senderName || 'DFQ Trade Escrow Security';
     const senderEmail = settings.senderEmail || 'no-reply@dfqtradecrow.com';
-    const subjectLine = settings.subjectLine || 'DFQ Trade Crow - Your Verification Code';
+    const subjectLine = settings.subjectLine || 'DFQ Trade Escrow - Your Verification Code';
 
     if (existing) {
       db.prepare(`

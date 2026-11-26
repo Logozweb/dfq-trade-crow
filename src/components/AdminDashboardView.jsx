@@ -37,11 +37,11 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
   const [saveResult, setSaveResult] = useState(null);
   const [emailSettings, setEmailSettings] = useState({
     provider: 'smtp',
-    smtp: { host: 'smtp.gmail.com', port: '587', secure: false, user: '', pass: '', senderName: 'DFQ Trade Crow Security', rejectUnauthorized: false },
+    smtp: { host: 'smtp.gmail.com', port: '587', secure: false, user: '', pass: '', senderName: 'DFQ Trade Escrow Security', rejectUnauthorized: false },
     resendApiKey: '',
-    senderName: 'DFQ Trade Crow Security',
+    senderName: 'DFQ Trade Escrow Security',
     senderEmail: 'no-reply@dfqtradecrow.com',
-    subjectLine: 'DFQ Trade Crow - Your Verification Code'
+    subjectLine: 'DFQ Trade Escrow - Your Verification Code'
   });
   const [showPass, setShowPass] = useState(false);
   const [emailSaving, setEmailSaving] = useState(false);
@@ -1459,7 +1459,7 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                         type="text"
                         value={emailSettings.senderName || ''}
                         onChange={(e) => setEmailSettings(prev => ({ ...prev, senderName: e.target.value }))}
-                        placeholder="DFQ Trade Crow Security"
+                        placeholder="DFQ Trade Escrow Security"
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
                       />
                     </div>
@@ -1485,7 +1485,7 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                       type="text"
                       value={emailSettings.subjectLine || ''}
                       onChange={(e) => setEmailSettings(prev => ({ ...prev, subjectLine: e.target.value }))}
-                      placeholder="DFQ Trade Crow - Your Verification Code"
+                      placeholder="DFQ Trade Escrow - Your Verification Code"
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-sky-500"
                     />
                   </div>
