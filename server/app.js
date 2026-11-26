@@ -805,7 +805,10 @@ app.all('/api/items.php', upload.fields([
   { name: 'receipt', maxCount: 1 }
 ]), (req, res) => {
   const action = req.query.action || (req.method === 'GET' ? 'list' : '');
-  if (req.method === 'GET' && action === 'list') return handleListItems(req, res);
+  if (req.method === 'GET' && (action === 'list' || action === 'my_items')) {
+    if (action === 'my_items') req.query.mine = '1';
+    return handleListItems(req, res);
+  }
   if (req.method === 'POST' && action === 'create') return handleCreateItem(req, res);
   if (req.method === 'POST' && action === 'boost') return handleBoostItem(req, res);
   if (req.method === 'POST' && action === 'report') return handleReportItem(req, res);
@@ -819,6 +822,10 @@ app.all('/api/items.php', upload.fields([
 
 // RESTful aliases for items
 app.get('/api/items', handleListItems);
+app.get('/api/items/my', (req, res) => {
+  req.query.mine = '1';
+  return handleListItems(req, res);
+});
 app.post('/api/items', upload.fields([
   { name: 'photos', maxCount: 10 },
   { name: 'photos[]', maxCount: 10 },
