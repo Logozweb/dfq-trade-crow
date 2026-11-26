@@ -97,6 +97,13 @@ export default function App() {
   const [marketplacePage, setMarketplacePage] = useState(1);
   const MARKETPLACE_PAGE_SIZE = 12;
 
+  // Robust Marketplace Sidebar Filters
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [sortBy, setSortBy] = useState('newest');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+
   // My Dashboard Dropdown
   const [showDashboardMenu, setShowDashboardMenu] = useState(false);
   const dashboardMenuRef = useRef(null);
@@ -228,9 +235,12 @@ export default function App() {
     });
   };
 
-  // Filtered Items
+  // Filtered & Sorted Items
   const filteredItems = useMemo(() => {
-    return items.filter(item => {
+    const min = minPrice !== '' ? Number(minPrice) : null;
+    const max = maxPrice !== '' ? Number(maxPrice) : null;
+
+    const list = items.filter(item => {
       if (selectedMode === 'favorites') {
         if (!favorites.includes(Number(item.id))) return false;
       } else if (selectedMode !== 'all' && item.mode !== selectedMode) {
@@ -242,6 +252,13 @@ export default function App() {
       if (selectedLocation !== 'all' && item.location !== selectedLocation) {
         return false;
       }
+      if (verifiedOnly && item.kyc_status !== 'approved' && Number(item.kyc_tier || 1) < 2) {
+        return false;
+      }
+      const val = Number(item.est_value || 0);
+      if (min !== null && !Number.isNaN(min) && val < min) return false;
+      if (max !== null && !Number.isNaN(max) && val > max) return false;
+
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const titleMatch = (item.title || '').toLowerCase().includes(q);
@@ -252,12 +269,20 @@ export default function App() {
       }
       return true;
     });
-  }, [items, selectedMode, selectedCategory, selectedLocation, searchQuery, favorites]);
+
+    if (sortBy === 'price_asc') {
+      return [...list].sort((a, b) => Number(a.est_value || 0) - Number(b.est_value || 0));
+    }
+    if (sortBy === 'price_desc') {
+      return [...list].sort((a, b) => Number(b.est_value || 0) - Number(a.est_value || 0));
+    }
+    return list;
+  }, [items, selectedMode, selectedCategory, selectedLocation, searchQuery, favorites, minPrice, maxPrice, verifiedOnly, sortBy]);
 
   // Reset marketplace pagination when filters change (Requirement 5)
   useEffect(() => {
     setMarketplacePage(1);
-  }, [selectedMode, selectedCategory, selectedLocation, searchQuery]);
+  }, [selectedMode, selectedCategory, selectedLocation, searchQuery, minPrice, maxPrice, verifiedOnly, sortBy]);
 
   const paginatedItems = useMemo(() => {
     const start = (marketplacePage - 1) * MARKETPLACE_PAGE_SIZE;
@@ -701,57 +726,177 @@ export default function App() {
               </div>
             )}
 
-            {/* Trade Mode Segmented Control & Item Count */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-                {[
-                  { key: 'all', label: 'All Listings' },
-                  { key: 'Barter Only', label: 'Direct Barter' },
-                  { key: 'Cash or Swap', label: 'Cash or Swap' },
-                  { key: 'Pawn / Quick Sale', label: 'Digital Pawn' },
-                  { key: 'favorites', label: `Saved (${favorites.length})` }
-                ].map(tab => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setSelectedMode(tab.key)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer whitespace-nowrap transition-all ${
-                      selectedMode === tab.key
-                        ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
-                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-              <div className="text-xs font-medium text-slate-500">
+            {/* Mobile Filter Toggle & Results Count */}
+            <div className="flex items-center justify-between gap-3 mb-4 lg:mb-6">
+              <button
+                type="button"
+                onClick={() => setShowMobileFilters(prev => !prev)}
+                className="lg:hidden inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 cursor-pointer shadow-xs"
+              >
+                <LayoutGrid className="w-3.5 h-3.5 text-sky-500" />
+                <span>{showMobileFilters ? 'Hide Filters' : 'Filters & Sort'}</span>
+              </button>
+              <div className="text-xs font-medium text-slate-500 ml-auto">
                 Showing <strong className="text-slate-900 dark:text-white">{filteredItems.length}</strong> active trades
               </div>
             </div>
 
-            {/* Category Chips Bar */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-3 mb-6 border-b border-slate-200 dark:border-slate-800 scrollbar-none">
-              {[
-                'all',
-                'Electronics & Phones',
-                'Furniture',
-                'Home Appliances',
-                'Vehicles & Bikes',
-                'Fashion & Watches'
-              ].map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium border-0 cursor-pointer whitespace-nowrap transition-all ${
-                    selectedCategory === cat
-                      ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 font-bold'
-                      : 'bg-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  {cat === 'all' ? 'All Categories' : cat}
-                </button>
-              ))}
-            </div>
+            <div className="flex flex-col lg:flex-row gap-6 items-start">
+              {/* Left Sidebar Filters */}
+              <aside className={`${showMobileFilters ? 'block' : 'hidden'} lg:block w-full lg:w-64 shrink-0 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-5 lg:sticky lg:top-20 shadow-xs`}>
+                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                    Filter Trades
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedMode('all');
+                      setSelectedCategory('all');
+                      setSelectedLocation('all');
+                      setMinPrice('');
+                      setMaxPrice('');
+                      setVerifiedOnly(false);
+                      setSortBy('newest');
+                      setSearchQuery('');
+                    }}
+                    className="text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline bg-transparent border-0 cursor-pointer p-0"
+                  >
+                    Reset All
+                  </button>
+                </div>
+
+                {/* Sort By Dropdown */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+                    Sort By
+                  </label>
+                  <select
+                    value={sortBy}
+                    onChange={e => setSortBy(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="price_asc">Value: Low to High</option>
+                    <option value="price_desc">Value: High to Low</option>
+                  </select>
+                </div>
+
+                {/* Location Dropdown */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+                    Location
+                  </label>
+                  <select
+                    value={selectedLocation}
+                    onChange={e => setSelectedLocation(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
+                  >
+                    <option value="all">All Locations</option>
+                    <option value="Lekki, Lagos">Lekki, Lagos</option>
+                    <option value="Ikeja, Lagos">Ikeja, Lagos</option>
+                    <option value="Yaba, Lagos">Yaba, Lagos</option>
+                    <option value="Abuja">Abuja</option>
+                    <option value="Port Harcourt">Port Harcourt</option>
+                  </select>
+                </div>
+
+                {/* Trade Mode */}
+                <div>
+                  <div className="text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-2 uppercase tracking-wide">
+                    Trade Mode
+                  </div>
+                  <div className="space-y-1.5">
+                    {[
+                      { key: 'all', label: 'All Listings' },
+                      { key: 'Barter Only', label: 'Direct Barter' },
+                      { key: 'Cash or Swap', label: 'Cash or Swap' },
+                      { key: 'Pawn / Quick Sale', label: 'Digital Pawn' },
+                      { key: 'favorites', label: `Saved (${favorites.length})` }
+                    ].map(tab => (
+                      <label key={tab.key} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                        <input
+                          type="radio"
+                          name="tradeModeFilter"
+                          checked={selectedMode === tab.key}
+                          onChange={() => setSelectedMode(tab.key)}
+                          className="accent-sky-600 cursor-pointer"
+                        />
+                        <span>{tab.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Categories */}
+                <div>
+                  <div className="text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-2 uppercase tracking-wide">
+                    Category
+                  </div>
+                  <div className="space-y-1.5">
+                    {[
+                      'all',
+                      'Electronics & Phones',
+                      'Furniture',
+                      'Home Appliances',
+                      'Vehicles & Bikes',
+                      'Fashion & Watches'
+                    ].map(cat => (
+                      <label key={cat} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                        <input
+                          type="radio"
+                          name="categoryFilter"
+                          checked={selectedCategory === cat}
+                          onChange={() => setSelectedCategory(cat)}
+                          className="accent-sky-600 cursor-pointer"
+                        />
+                        <span>{cat === 'all' ? 'All Categories' : cat}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Price Range */}
+                <div>
+                  <div className="text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-2 uppercase tracking-wide">
+                    Valuation Range (₦)
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Min ₦"
+                      value={minPrice}
+                      onChange={e => setMinPrice(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Max ₦"
+                      value={maxPrice}
+                      onChange={e => setMaxPrice(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Verified Users Only */}
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={verifiedOnly}
+                      onChange={e => setVerifiedOnly(e.target.checked)}
+                      className="accent-emerald-600 w-3.5 h-3.5 cursor-pointer"
+                    />
+                    <span>Verified Traders Only</span>
+                  </label>
+                </div>
+              </aside>
+
+              {/* Right Main Grid */}
+              <div className="flex-1 min-w-0 w-full">
 
             {/* Grid of Clean Item Cards */}
             {filteredItems.length === 0 ? (
@@ -947,6 +1092,8 @@ export default function App() {
               </div>
             </>
           )}
+              </div>
+            </div>
           </main>
         </>
       )}

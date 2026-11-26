@@ -8,6 +8,7 @@ export default function KycModal({ user, onClose, onSuccess }) {
   // Form states
   const [tier, setTier] = useState('2');
   const [ninBvn, setNinBvn] = useState(user?.nin_bvn || '');
+  const [bvnNumber, setBvnNumber] = useState('');
   const [fullName, setFullName] = useState(user?.full_name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [idType, setIdType] = useState('NIN');
@@ -16,6 +17,8 @@ export default function KycModal({ user, onClose, onSuccess }) {
   const [cacNumber, setCacNumber] = useState('');
   const [idFile, setIdFile] = useState(null);
   const [idPreview, setIdPreview] = useState(null);
+  const [cacPreview, setCacPreview] = useState(null);
+  const [proofAddressPreview, setProofAddressPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -51,14 +54,11 @@ export default function KycModal({ user, onClose, onSuccess }) {
   const currentTier = Number(kycData?.kyc_tier || user?.kyc_tier || 1);
   const verification = kycData?.verification;
 
-  const handleFileChange = (e) => {
-    const file = e.target.files && e.target.files[0];
+  const compressAndSet = (file, setter) => {
     if (!file) return;
-    setIdFile(file);
-
     if (file.type === 'application/pdf') {
       const reader = new FileReader();
-      reader.onload = (ev) => setIdPreview(ev.target.result);
+      reader.onload = (ev) => setter(ev.target.result);
       reader.readAsDataURL(file);
       return;
     }
@@ -84,15 +84,19 @@ export default function KycModal({ user, onClose, onSuccess }) {
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
-        const compressed = canvas.toDataURL('image/jpeg', 0.85);
-        setIdPreview(compressed);
+        setter(canvas.toDataURL('image/jpeg', 0.85));
       };
-      img.onerror = () => {
-        setIdPreview(ev.target.result);
-      };
+      img.onerror = () => setter(ev.target.result);
       img.src = ev.target.result;
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setIdFile(file);
+    compressAndSet(file, setIdPreview);
   };
 
   const handleSubmit = async (e) => {
@@ -102,16 +106,45 @@ export default function KycModal({ user, onClose, onSuccess }) {
 
     const targetTier = showUpgradeForm || currentStatus === 'approved' ? 3 : parseInt(tier, 10);
 
-    if (targetTier !== 3 && (!ninBvn.trim() || ninBvn.trim().length < 8)) {
-      setError('Please provide a valid National Identification Number (NIN) or BVN (at least 8-11 digits).');
-      setLoading(false);
-      return;
+    if (targetTier === 2) {
+      if (!ninBvn.trim() || ninBvn.trim().length < 8) {
+        setError('Please provide a valid 11-digit National Identification Number (NIN).');
+        setLoading(false);
+        return;
+      }
+      if (!bvnNumber.trim() || bvnNumber.trim().length < 8) {
+        setError('Please provide a valid 11-digit Bank Verification Number (BVN).');
+        setLoading(false);
+        return;
+      }
+      if (!idPreview) {
+        setError('NIN Card / Slip upload is compulsory for Tier 2 verification.');
+        setLoading(false);
+        return;
+      }
     }
 
-    if (targetTier === 3 && !businessName.trim()) {
-      setError('Registered business or store name is required for Tier 3 Merchant status.');
-      setLoading(false);
-      return;
+    if (targetTier === 3) {
+      if (!businessName.trim()) {
+        setError('Registered business or store name is required for Tier 3 Merchant status.');
+        setLoading(false);
+        return;
+      }
+      if (!cacNumber.trim()) {
+        setError('CAC Registration Number is mandatory for Tier 3.');
+        setLoading(false);
+        return;
+      }
+      if (!cacPreview) {
+        setError('CAC Registration Document upload is mandatory for Tier 3.');
+        setLoading(false);
+        return;
+      }
+      if (!proofAddressPreview) {
+        setError('Proof of Address upload is mandatory for Tier 3.');
+        setLoading(false);
+        return;
+      }
     }
 
     try {
@@ -122,12 +155,15 @@ export default function KycModal({ user, onClose, onSuccess }) {
           tier: targetTier,
           full_name: fullName || user?.full_name || 'Trader',
           phone: phone || user?.phone || '',
-          nin_bvn: (ninBvn || user?.nin_bvn || 'VERIFIED').trim(),
-          id_type: idType,
+          nin_bvn: (ninBvn || user?.nin_bvn || '').trim(),
+          bvn_number: bvnNumber.trim(),
+          id_type: 'NIN',
           id_document_data: idPreview || undefined,
           business_name: businessName.trim(),
           business_address: businessAddress.trim(),
-          cac_number: cacNumber.trim()
+          cac_number: cacNumber.trim(),
+          cac_document_data: cacPreview || undefined,
+          proof_of_address_data: proofAddressPreview || undefined
         })
       });
       let data;
@@ -390,10 +426,11 @@ export default function KycModal({ user, onClose, onSuccess }) {
 
             <div>
               <label className="block text-xs font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                CAC Business Registration Number (Optional)
+                CAC Business Registration Number *
               </label>
               <input
                 type="text"
+                required
                 value={cacNumber}
                 onChange={e => setCacNumber(e.target.value)}
                 placeholder="RC / BN Number (e.g. BN-1234567)"
@@ -403,24 +440,49 @@ export default function KycModal({ user, onClose, onSuccess }) {
 
             <div>
               <label className="block text-xs font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                Storefront Photo or CAC Certificate (Optional)
+                CAC Registration Document *
               </label>
               <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-3 text-center bg-slate-50 dark:bg-slate-800/40 relative">
                 <input
                   type="file"
                   accept="image/*,application/pdf"
-                  onChange={handleFileChange}
+                  onChange={e => compressAndSet(e.target.files?.[0], setCacPreview)}
                   className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                 />
-                {idPreview ? (
+                {cacPreview ? (
                   <div className="flex items-center justify-center gap-2 text-xs font-medium text-emerald-600">
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Store document attached ready for review</span>
+                    <span>CAC document attached ready for review</span>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
                     <UploadCloud className="w-4 h-4 text-amber-500" />
-                    <span>Upload storefront signage photo or CAC certificate</span>
+                    <span>Upload CAC registration certificate (Image or PDF)</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold mb-1 text-slate-700 dark:text-slate-300">
+                Proof of Address (Utility Bill / Tenancy / Bank Statement) *
+              </label>
+              <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-3 text-center bg-slate-50 dark:bg-slate-800/40 relative">
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={e => compressAndSet(e.target.files?.[0], setProofAddressPreview)}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                />
+                {proofAddressPreview ? (
+                  <div className="flex items-center justify-center gap-2 text-xs font-medium text-emerald-600">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Proof of Address attached ready for review</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+                    <UploadCloud className="w-4 h-4 text-amber-500" />
+                    <span>Upload Proof of Address (Image or PDF)</span>
                   </div>
                 )}
               </div>

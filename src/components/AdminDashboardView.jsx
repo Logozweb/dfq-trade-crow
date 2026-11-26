@@ -173,25 +173,37 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
 
   // KYC Actions
   const handleApproveKyc = async (id, name) => {
+    const message = prompt(
+      `Optional approval message to send to ${name}:`,
+      'Your identity details and documents have been verified and approved.'
+    );
+    if (message === null) return;
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/admin/kyc/${id}/approve`, { method: 'POST' });
+      const res = await fetch(`/api/admin/kyc/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      });
       const json = await res.json();
       setActionLoading(false);
       if (json.success) {
-        showToast(`KYC Approved for ${name}! User can now list items.`);
+        showToast(`KYC Approved for ${name}! Notification & email sent.`);
         fetchAdminData();
       } else {
-        alert(json.message || 'Failed to approve KYC.');
+        showToast(json.message || 'Failed to approve KYC.', 'error');
       }
     } catch (_) {
       setActionLoading(false);
-      alert('Error approving KYC.');
+      showToast('Error approving KYC.', 'error');
     }
   };
 
   const handleRejectKyc = async (id, name) => {
-    const reason = prompt(`Enter reason for rejecting KYC for ${name}:`, 'NIN details did not match profile name.');
+    const reason = prompt(
+      `Enter disapproval message to send to ${name}:`,
+      'Submitted NIN/BVN or documents could not be verified. Please re-submit clear details.'
+    );
     if (!reason) return;
 
     setActionLoading(true);
@@ -199,19 +211,19 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
       const res = await fetch(`/api/admin/kyc/${id}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason })
+        body: JSON.stringify({ reason, message: reason })
       });
       const json = await res.json();
       setActionLoading(false);
       if (json.success) {
-        showToast(`KYC rejected for ${name}.`);
+        showToast(`KYC disapproved for ${name}. Applicant notified.`);
         fetchAdminData();
       } else {
-        alert(json.message || 'Failed to reject KYC.');
+        showToast(json.message || 'Failed to disapprove KYC.', 'error');
       }
     } catch (_) {
       setActionLoading(false);
-      alert('Error rejecting KYC.');
+      showToast('Error disapproving KYC.', 'error');
     }
   };
 
@@ -682,9 +694,10 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                 <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold">
                   <tr>
                     <th className="py-3 px-4">Applicant</th>
-                    <th className="py-3 px-4">Verification Type</th>
-                    <th className="py-3 px-4">NIN / BVN Number</th>
+                    <th className="py-3 px-4">Tier</th>
+                    <th className="py-3 px-4">NIN &amp; BVN</th>
                     <th className="py-3 px-4">Business / CAC</th>
+                    <th className="py-3 px-4">Documents</th>
                     <th className="py-3 px-4">Submitted</th>
                     <th className="py-3 px-4 text-right">Review Action</th>
                   </tr>
@@ -707,19 +720,63 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                           <span>Tier {k.tier}: {k.tier === 3 ? 'Pro Storefront' : 'Verified Trader'}</span>
                         </span>
                       </td>
-                      <td className="py-3.5 px-4">
-                        <div className="font-mono font-bold text-slate-800 dark:text-slate-200">{k.nin_bvn}</div>
-                        <div className="text-[10px] text-slate-500 uppercase">{k.id_type}</div>
+                      <td className="py-3.5 px-4 space-y-0.5">
+                        <div className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                          <span className="text-[10px] text-slate-400 font-sans mr-1">NIN:</span>{k.nin_bvn || '—'}
+                        </div>
+                        {k.bvn_number && (
+                          <div className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                            <span className="text-[10px] text-slate-400 font-sans mr-1">BVN:</span>{k.bvn_number}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3.5 px-4">
                         {k.business_name ? (
                           <div>
                             <div className="font-semibold text-slate-800 dark:text-slate-200">{k.business_name}</div>
+                            {k.cac_number && <div className="text-[10px] font-mono text-amber-600 dark:text-amber-400">CAC: {k.cac_number}</div>}
                             <div className="text-[10px] text-slate-500">{k.business_address || 'Storefront Verified'}</div>
                           </div>
                         ) : (
                           <span className="text-slate-400 italic">Individual Trader</span>
                         )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex flex-wrap gap-1.5">
+                          {k.id_document_path && (
+                            <a
+                              href={`/${k.id_document_path}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2 py-1 rounded-md bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 text-[10px] font-semibold hover:underline"
+                            >
+                              NIN Card
+                            </a>
+                          )}
+                          {k.cac_document_path && (
+                            <a
+                              href={`/${k.cac_document_path}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2 py-1 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-[10px] font-semibold hover:underline"
+                            >
+                              CAC Doc
+                            </a>
+                          )}
+                          {k.proof_of_address_path && (
+                            <a
+                              href={`/${k.proof_of_address_path}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-semibold hover:underline"
+                            >
+                              Address Proof
+                            </a>
+                          )}
+                          {!k.id_document_path && !k.cac_document_path && !k.proof_of_address_path && (
+                            <span className="text-slate-400 italic text-[10px]">No docs</span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3.5 px-4 text-slate-500 text-[11px]">
                         {new Date(k.created_at).toLocaleDateString()}
@@ -737,10 +794,10 @@ export default function AdminDashboardView({ onBackToMarketplace }) {
                           <button
                             onClick={() => handleRejectKyc(k.id, k.full_name)}
                             disabled={actionLoading}
-                            className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-red-50 hover:text-red-600 dark:bg-slate-800 dark:hover:bg-red-950/50 text-slate-600 dark:text-slate-400 font-semibold text-xs border-0 cursor-pointer transition-colors"
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-red-50 hover:text-red-600 dark:bg-slate-800 dark:hover:bg-red-950/50 text-slate-600 dark:text-slate-400 font-semibold text-xs border-0 cursor-pointer flex items-center gap-1 transition-colors"
                           >
                             <X className="w-3 h-3" />
-                            <span>Reject</span>
+                            <span>Disapprove</span>
                           </button>
                         </div>
                       </td>

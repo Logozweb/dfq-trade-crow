@@ -331,6 +331,27 @@ function handleReferralInfo(req, res) {
   });
 }
 
+function saveBase64Doc(dataUrl, userId, prefix) {
+  if (!dataUrl || typeof dataUrl !== 'string') return null;
+  const matches = dataUrl.match(/^data:([a-zA-Z0-9/+-]+);base64,(.+)$/);
+  if (!matches) return null;
+  const mime = (matches[1] || '').toLowerCase();
+  let ext = 'jpg';
+  if (mime.includes('png')) ext = 'png';
+  else if (mime.includes('pdf')) ext = 'pdf';
+  else if (mime.includes('webp')) ext = 'webp';
+  else if (mime.includes('gif')) ext = 'gif';
+  else if (mime.includes('jpeg')) ext = 'jpg';
+  const filename = `${prefix}_${userId}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
+  try {
+    fs.writeFileSync(path.join(UPLOAD_DIR, filename), Buffer.from(matches[2], 'base64'));
+    return 'uploads/' + filename;
+  } catch (fErr) {
+    console.error(`[KYC Upload Error - ${prefix}]`, fErr);
+    return null;
+  }
+}
+
 function handleKycSubmit(req, res) {
   const userId = requireAuth(req, res);
   if (!userId) return;
@@ -338,53 +359,54 @@ function handleKycSubmit(req, res) {
   const tier = parseInt(req.body.tier || '2', 10);
   const fullName = (req.body.full_name || req.session.userName || 'Trader').trim();
   const phone = (req.body.phone || '').trim();
-  const ninBvn = (req.body.nin_bvn || '').trim();
+  const ninBvn = (req.body.nin_bvn || req.body.nin_number || '').trim();
+  const bvnNumber = (req.body.bvn_number || '').trim();
   const idType = (req.body.id_type || 'NIN').trim();
   const businessName = (req.body.business_name || '').trim();
   const businessAddress = (req.body.business_address || '').trim();
   const cacNumber = (req.body.cac_number || '').trim();
 
-  if (!ninBvn) {
-    return sendJson(res, false, 'National Identification Number (NIN) or BVN is required for verification.', {}, 400);
-  }
-
-  if (tier === 3 && !businessName) {
-    return sendJson(res, false, 'Registered business name is required for Pro Storefront status.', {}, 400);
-  }
-
-  // Handle uploaded document if any
-  let docPath = null;
-  if (req.file) {
-    docPath = 'uploads/' + req.file.filename;
-  } else if (req.body.id_document_data) {
-    const matches = req.body.id_document_data.match(/^data:([a-zA-Z0-9/+-]+);base64,(.+)$/);
-    if (matches) {
-      const mime = (matches[1] || '').toLowerCase();
-      let ext = 'jpg';
-      if (mime.includes('png')) ext = 'png';
-      else if (mime.includes('pdf')) ext = 'pdf';
-      else if (mime.includes('webp')) ext = 'webp';
-      else if (mime.includes('gif')) ext = 'gif';
-      else if (mime.includes('jpeg')) ext = 'jpg';
-      const filename = `kyc_${userId}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
-      try {
-        fs.writeFileSync(path.join(UPLOAD_DIR, filename), Buffer.from(matches[2], 'base64'));
-        docPath = 'uploads/' + filename;
-      } catch (fErr) {
-        console.error('[KYC Upload Error]', fErr);
-      }
+  if (tier === 2) {
+    if (!ninBvn) {
+      return sendJson(res, false, 'National Identification Number (NIN) is required for Tier 2.', {}, 400);
+    }
+    if (!bvnNumber) {
+      return sendJson(res, false, 'Bank Verification Number (BVN) is required for Tier 2.', {}, 400);
+    }
+    if (!req.file && !req.body.id_document_data) {
+      return sendJson(res, false, 'NIN Card / Slip upload is required for Tier 2.', {}, 400);
     }
   }
 
-  // Insert or update pending KYC record
-  const insert = db.prepare(`
+  if (tier === 3) {
+    if (!businessName) {
+      return sendJson(res, false, 'Registered business name is required for Tier 3 Pro Storefront.', {}, 400);
+    }
+    if (!cacNumber) {
+      return sendJson(res, false, 'CAC Registration Number is required for Tier 3.', {}, 400);
+    }
+    if (!req.body.cac_document_data) {
+      return sendJson(res, false, 'CAC Registration Document upload is mandatory for Tier 3.', {}, 400);
+    }
+    if (!req.body.proof_of_address_data) {
+      return sendJson(res, false, 'Proof of Address upload is mandatory for Tier 3.', {}, 400);
+    }
+  }
+
+  // Handle uploaded documents
+  let docPath = req.file ? ('uploads/' + req.file.filename) : saveBase64Doc(req.body.id_document_data, userId, 'kyc_nin');
+  const cacDocPath = saveBase64Doc(req.body.cac_document_data, userId, 'kyc_cac');
+  const proofAddressPath = saveBase64Doc(req.body.proof_of_address_data, userId, 'kyc_addr');
+
+  // Insert pending KYC record
+  db.prepare(`
     INSERT INTO kyc_verifications (
-      user_id, tier, full_name, phone, nin_bvn, id_type, id_document_path,
-      business_name, business_address, cac_number, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review')
+      user_id, tier, full_name, phone, nin_bvn, bvn_number, id_type, id_document_path,
+      business_name, business_address, cac_number, cac_document_path, proof_of_address_path, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review')
   `).run(
-    userId, tier, fullName, phone, ninBvn, idType, docPath,
-    businessName || null, businessAddress || null, cacNumber || null
+    userId, tier, fullName, phone, ninBvn || 'TIER3-UPGRADE', bvnNumber || null, idType, docPath,
+    businessName || null, businessAddress || null, cacNumber || null, cacDocPath, proofAddressPath
   );
 
   // Update user's KYC status to pending review
@@ -392,11 +414,11 @@ function handleKycSubmit(req, res) {
     UPDATE users
     SET kyc_status = 'pending_review',
         kyc_tier = ?,
-        nin_bvn = ?,
-        business_name = ?,
-        business_address = ?
+        nin_bvn = COALESCE(NULLIF(?, ''), nin_bvn),
+        business_name = COALESCE(NULLIF(?, ''), business_name),
+        business_address = COALESCE(NULLIF(?, ''), business_address)
     WHERE id = ?
-  `).run(tier, ninBvn, businessName || null, businessAddress || null, userId);
+  `).run(tier, ninBvn, businessName || '', businessAddress || '', userId);
 
   // Notify user
   createNotification(userId, 'KYC Submitted for Review', 'Your identity details and NIN have been submitted. An administrator will review your verification before listing is enabled.', 'kyc');
@@ -1209,47 +1231,75 @@ app.get('/api/admin/data', (req, res) => {
 });
 
 // Admin Review: Approve / Reject KYC
-app.post('/api/admin/kyc/:id/approve', (req, res) => {
+app.post('/api/admin/kyc/:id/approve', async (req, res) => {
   const adminId = requireAdmin(req, res);
   if (!adminId) return;
 
   const kycId = parseInt(req.params.id, 10);
-  const kyc = db.prepare('SELECT * FROM kyc_verifications WHERE id = ?').get(kycId);
+  const message = (req.body?.message || req.body?.admin_note || 'Your identity details and documents have been verified and approved by our compliance desk.').trim();
+  const kyc = db.prepare('SELECT k.*, u.email FROM kyc_verifications k JOIN users u ON k.user_id = u.id WHERE k.id = ?').get(kycId);
   if (!kyc) return sendJson(res, false, 'KYC submission not found.', {}, 404);
 
-  db.prepare(`UPDATE kyc_verifications SET status = 'approved', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?`).run(adminId, kycId);
+  db.prepare(`UPDATE kyc_verifications SET status = 'approved', admin_note = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?`).run(message, adminId, kycId);
   db.prepare(`UPDATE users SET kyc_status = 'approved', kyc_tier = ? WHERE id = ?`).run(kyc.tier, kyc.user_id);
 
+  const notifBody = `Congratulations! Your Tier ${kyc.tier} KYC verification has been approved. Note from Compliance: "${message}"`;
   createNotification(
     kyc.user_id,
     'KYC Identity Verification Approved!',
-    `Congratulations! Your identity details and NIN have been approved by compliance. You now have the ${kyc.tier === 3 ? 'Gold Seal Merchant' : 'Blue Shield Trader'} badge and can post listings freely.`,
+    notifBody,
     'kyc'
   );
+
+  if (kyc.email) {
+    dispatchEmail({
+      to: kyc.email,
+      recipientName: kyc.full_name,
+      subject: 'DFQ Trade Escrow - KYC Verification Approved',
+      html: buildStatusNotificationHtml(
+        kyc.full_name,
+        `Tier ${kyc.tier} KYC Approved`,
+        `Congratulations! Your identity verification has been approved.<br/><br/><strong>Compliance Message:</strong> ${message}`
+      )
+    }).catch(() => {});
+  }
 
   return sendJson(res, true, `KYC application #${kycId} approved successfully for ${kyc.full_name}!`);
 });
 
-app.post('/api/admin/kyc/:id/reject', (req, res) => {
+app.post('/api/admin/kyc/:id/reject', async (req, res) => {
   const adminId = requireAdmin(req, res);
   if (!adminId) return;
 
   const kycId = parseInt(req.params.id, 10);
-  const reason = (req.body.reason || 'Information provided did not match official records.').trim();
-  const kyc = db.prepare('SELECT * FROM kyc_verifications WHERE id = ?').get(kycId);
+  const reason = (req.body?.reason || req.body?.message || 'Information provided did not match official records.').trim();
+  const kyc = db.prepare('SELECT k.*, u.email FROM kyc_verifications k JOIN users u ON k.user_id = u.id WHERE k.id = ?').get(kycId);
   if (!kyc) return sendJson(res, false, 'KYC submission not found.', {}, 404);
 
-  db.prepare(`UPDATE kyc_verifications SET status = 'rejected', rejection_reason = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?`).run(reason, adminId, kycId);
+  db.prepare(`UPDATE kyc_verifications SET status = 'rejected', rejection_reason = ?, admin_note = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?`).run(reason, reason, adminId, kycId);
   db.prepare(`UPDATE users SET kyc_status = 'rejected' WHERE id = ?`).run(kyc.user_id);
 
   createNotification(
     kyc.user_id,
-    'KYC Verification Requires Attention',
-    `Your identity verification was not approved. Reason: ${reason}. Please update your details and re-submit.`,
+    'KYC Verification Disapproved',
+    `Your Tier ${kyc.tier} identity verification was not approved. Reason: ${reason}. Please update your details and re-submit.`,
     'kyc'
   );
 
-  return sendJson(res, true, `KYC application #${kycId} rejected.`);
+  if (kyc.email) {
+    dispatchEmail({
+      to: kyc.email,
+      recipientName: kyc.full_name,
+      subject: 'DFQ Trade Escrow - KYC Verification Update',
+      html: buildStatusNotificationHtml(
+        kyc.full_name,
+        `Tier ${kyc.tier} KYC Disapproved`,
+        `Your identity verification was not approved.<br/><br/><strong>Reason / Message:</strong> ${reason}<br/><br/>Please log in and re-submit accurate details.`
+      )
+    }).catch(() => {});
+  }
+
+  return sendJson(res, true, `KYC application #${kycId} disapproved and applicant notified.`);
 });
 
 // Admin Review: Approve / Reject Listing
